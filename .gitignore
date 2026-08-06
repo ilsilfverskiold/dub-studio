@@ -1,0 +1,11 @@
+.env
+*.log
+.DS_Store
+projects/
+cache/
+state/
+uploads/
+output/
+work/
+__pycache__/
+.venv/

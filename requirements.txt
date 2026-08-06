@@ -1,0 +1,8 @@
+# Pinned to the versions Dub Studio was built and verified against (Python 3.11–3.13).
+numpy==2.4.6
+torch==2.12.1
+pyannote.audio==4.0.7
+pedalboard==0.9.23
+imageio-ffmpeg==0.6.0
+audio-separator==0.44.2
+onnxruntime==1.27.0

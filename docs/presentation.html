@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dub Studio — the story</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+:root{
+  --bg:#08080a; --panel:#0a0a0d; --line:rgba(255,255,255,.07);
+  --text:#e8e8ee; --text2:#c4c4cd; --dim:#6b6b76; --faint:#4d4d57;
+  --acc:#3b41c9; --ind:#9095e6;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-snap-type:y mandatory}
+body{background:var(--bg);color:var(--text);font-family:'Instrument Sans',system-ui,sans-serif;
+     font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+section{height:100vh;overflow:hidden;scroll-snap-align:start;scroll-snap-stop:always;
+        display:flex;align-items:center;justify-content:center;padding:0 32px;
+        border-bottom:1px solid var(--line)}
+.wrap{max-width:880px;width:100%}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--ind);
+        text-transform:uppercase;margin-bottom:16px}
+.kicker b{color:var(--faint);font-weight:400;margin-right:10px}
+h1{font-size:clamp(30px,4.6vw,48px);font-weight:700;letter-spacing:-.02em;line-height:1.12;
+   margin-bottom:30px}
+h1 .accent{color:var(--ind)}
+.tags{font-family:var(--mono);font-size:13px;color:var(--text2);margin-top:18px}
+.tags i{color:var(--faint);font-style:normal;margin:0 10px}
+.note{color:var(--dim);font-size:14px;margin-top:14px;max-width:62ch}
+
+/* slide 1 — clips */
+.clips{display:flex;gap:14px;margin-top:6px}
+.clipbox{flex:1;aspect-ratio:9/16;max-height:44vh;border:1.5px dashed rgba(255,255,255,.18);
+         border-radius:12px;display:flex;align-items:center;justify-content:center;
+         color:var(--faint);font-family:var(--mono);font-size:12px;text-align:center;
+         padding:16px;background:var(--panel)}
+.clips video{flex:1;min-width:0;max-height:44vh;border-radius:12px;background:#000;object-fit:contain}
+
+/* slide 2 — flow pills */
+.flowline{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:8px}
+.pill{border:1px solid rgba(255,255,255,.14);border-radius:24px;padding:10px 20px;
+      font-size:16.5px;color:var(--text);background:var(--panel);white-space:nowrap}
+.fa{color:var(--faint);font-family:var(--mono);font-size:14px}
+
+/* slides 3 & 4 — short lines */
+.line{display:flex;gap:16px;align-items:baseline;padding:13px 0;font-size:19px;color:var(--text2)}
+.line .n{font-family:var(--mono);color:var(--ind);font-size:14px}
+.line em{color:var(--text);font-style:normal;font-weight:600}
+.line .why{color:var(--dim);font-size:15.5px}
+.foot{margin-top:34px;font-family:var(--mono);font-size:12.5px;color:var(--faint)}
+.foot b{color:var(--ind);font-weight:500}
+
+/* dots */
+.dots{position:fixed;right:18px;top:50%;transform:translateY(-50%);display:flex;
+      flex-direction:column;gap:10px;z-index:5}
+.dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.15);transition:background .2s}
+.dots i.on{background:var(--ind)}
+@media (max-width:700px){
+  section{height:auto;min-height:100vh;overflow:visible;padding:64px 20px}
+  .clips{flex-direction:column}.clipbox,.clips video{max-height:36vh}
+  .pill{white-space:normal}
+  .line{font-size:18px}
+  .dots{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ================================================= 01 · PROBLEM -->
+<section>
+  <div class="wrap">
+    <div class="kicker"><b>01</b>The problem</div>
+    <h1>AI clips don't sound like <span class="accent">one video</span>.</h1>
+
+    <!-- DROP YOUR TWO CLIPS HERE: replace the two boxes with
+         <video src="clip1.mp4" controls></video>
+         <video src="clip2.mp4" controls></video> -->
+    <div class="clips">
+      <div class="clipbox">CLIP 1</div>
+      <div class="clipbox">CLIP 2</div>
+    </div>
+
+    <div class="tags">the voice changes<i>·</i>the loudness jumps<i>·</i>every cut is audible</div>
+    <p class="note">Movies never made their sound in one take either — dialogue, footsteps and music
+      are added afterwards. So this isn't supposed to work out of the box. That's the part we have
+      to rebuild for AI video.</p>
+  </div>
+</section>
+
+<!-- ================================================= 02 · SOLUTION, PART ONE -->
+<section>
+  <div class="wrap">
+    <div class="kicker"><b>02</b>The solution — part one</div>
+    <h1>Keep one voice across <span class="accent">every clip</span>.</h1>
+
+    <div class="flowline">
+      <span class="pill">find who speaks, and when</span><span class="fa">→</span>
+      <span class="pill">a new voice re-performs the lines</span><span class="fa">→</span>
+      <span class="pill">separate voice from background</span><span class="fa">→</span>
+      <span class="pill">mix it back together</span>
+    </div>
+
+    <p class="note">The new voice copies how each line was said — words, timing, emotion — so nothing
+      is transcribed. The original background is kept, just turned down under each new line.</p>
+
+    <p class="foot">open source · <b>→ live demo</b></p>
+  </div>
+</section>
+
+<!-- ================================================= 03 · LEARNINGS -->
+<section>
+  <div class="wrap">
+    <div class="kicker"><b>03</b>Learnings</div>
+    <h1>It's not as easy as it sounds.</h1>
+
+    <div class="line"><span class="n">01</span><p><em>you can't transcribe your way through it.</em> <span class="why">vision models can't reliably get the words right, even at temperature zero — so the new voice copies the audio itself</span></p></div>
+    <div class="line"><span class="n">02</span><p><em>the edge case: two speakers who sound the same.</em> <span class="why">detecting speech is automated and works — but two near-identical AI voices with broken lip-sync can't be split by ear or eye; you mark it yourself</span></p></div>
+    <div class="line"><span class="n">03</span><p><em>the voice model re-voices everything you send it.</em> <span class="why">a bare moo comes back as spoken words — real animal sounds are kept from the original</span></p></div>
+    <div class="line"><span class="n">04</span><p><em>the old voice doesn't just subtract out.</em> <span class="why">it stays audible behind the new one — even real separation leaves traces</span></p></div>
+    <div class="line"><span class="n">05</span><p><em>a raw AI voice doesn't sit in the video.</em> <span class="why">no set loudness, no room — it takes EQ, compression and levelling by ear</span></p></div>
+  </div>
+</section>
+
+<!-- ================================================= 04 · WHAT'S NEXT -->
+<section>
+  <div class="wrap">
+    <div class="kicker"><b>04</b>What's next — part two</div>
+    <h1>Next: rebuild the <span class="accent">background</span> too.</h1>
+
+    <div class="line"><span class="n">→</span><p>today we keep the original background — <em>it's easier</em></p></div>
+    <div class="line"><span class="n">→</span><p>next we make it ourselves — effects, ambience and music become <em>our choice</em></p></div>
+    <div class="line"><span class="n">→</span><p>models suggest sounds on the timeline — <em>you adjust</em></p></div>
+
+    <p class="foot">open source — github.com/… (link goes here)</p>
+  </div>
+</section>
+
+<div class="dots"><i class="on"></i><i></i><i></i><i></i></div>
+
+<script>
+const secs=[...document.querySelectorAll('section')];
+const dots=[...document.querySelectorAll('.dots i')];
+const smooth=matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth';
+function cur(){return Math.round(scrollY/innerHeight)}
+function go(i){secs[Math.max(0,Math.min(secs.length-1,i))].scrollIntoView({behavior:smooth})}
+addEventListener('keydown',e=>{
+  if(['ArrowDown','PageDown',' ','ArrowRight'].includes(e.key)){e.preventDefault();go(cur()+1)}
+  if(['ArrowUp','PageUp','ArrowLeft'].includes(e.key)){e.preventDefault();go(cur()-1)}
+});
+addEventListener('scroll',()=>{const c=cur();dots.forEach((d,i)=>d.classList.toggle('on',i===c))},{passive:true});
+</script>
+</body>
+</html>
