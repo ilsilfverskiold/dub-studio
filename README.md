@@ -10,15 +10,15 @@ It runs on your machine, in your browser, on your own API keys. Every step that 
 first and shows the price. Everything else — detecting speech, editing, mixing, rendering — is
 local, free, and repeatable.
 
-**This is a first version and a work in progress.** We're still learning how to build it well.
-The next step is to stop borrowing the original background sound and instead build our own music,
+**This is a first version and a work in progress.** I'm still learning how to build it well.
+The next step is to stop borrowing the original background sound and instead build my own music,
 ambience and effects — see [Taking it further](#taking-it-further).
 
 ![Dub Studio mix stage](screens/dub_studio_cast_mix.png)
 
 ## What it costs to use
 
-You pay the AI providers directly — there is nothing to pay us.
+You pay the AI providers directly — there is nothing to pay me.
 
 | What | Provider | Cost |
 |---|---|---|
@@ -106,13 +106,13 @@ longer write-up on the how and the why is coming as an article.
 
 ## Taking it further
 
-Two things this needs that we haven't solved — for anyone who wants to build on it:
+Two things this needs that I haven't solved — for anyone who wants to build on it:
 
 **1. A cheap way to extract the vocal.** The vocal that gets re-voiced is extracted with
 ElevenLabs isolation today, and that is most of the per-clip cost. A local extraction of the same
 quality would make the tool nearly free to run.
 
-**2. Build the background instead of borrowing it.** Today we keep the original background sound
-because it's easier. The goal is making it ourselves: vision models identify the events that need
+**2. Build the background instead of borrowing it.** Today the tool keeps the original background
+sound because it's easier. The goal is to build it instead: vision models identify the events that need
 effects, the ambience that should carry across shots, and the music — then suggest a soundtrack
 on the timeline that you tweak, piece by piece.
