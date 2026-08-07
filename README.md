@@ -113,9 +113,6 @@ file with the demo videos embedded, so download it and double-click — it opens
 no server needed. Press ↓ or space to move one idea at a time, ↑ to go back, and R to replay a
 slide's animation.
 
-To change it, edit `docs/presentation.html` (the readable source) and rebuild the standalone with
-`python3 docs/build_standalone.py`.
-
 ## Taking it further
 
 Two things this needs that I haven't solved — for anyone who wants to build on it:
