@@ -5,151 +5,1067 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dub Studio — the story</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&display=swap');
+
+/* Tokens are the app's tokens — the deck and the live demo are one world. */
 :root{
-  --bg:#08080a; --panel:#0a0a0d; --line:rgba(255,255,255,.07);
+  --bg:#08080a; --panel:#0a0a0d; --card:#0c0c10;
+  --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.11);
   --text:#e8e8ee; --text2:#c4c4cd; --dim:#6b6b76; --faint:#4d4d57;
-  --acc:#3b41c9; --ind:#9095e6;
+  --acc:#3b41c9; --ind:#9095e6; --ind3:#b6bbef;
+  --amber:#f0b955; --ok:#3ecf8e; --err:#ff7b7b;
+  --cast1:#9095e6; --cast2:#e69f90; --cast3:#8fd8c0;
   --mono:'JetBrains Mono',ui-monospace,monospace;
+  --serif:'Newsreader',Georgia,serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{scroll-snap-type:y mandatory}
+html{scroll-snap-type:y mandatory;background:var(--bg)}
 body{background:var(--bg);color:var(--text);font-family:'Instrument Sans',system-ui,sans-serif;
      font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
-section{height:100vh;overflow:hidden;scroll-snap-align:start;scroll-snap-stop:always;
-        display:flex;align-items:center;justify-content:center;padding:0 32px;
-        border-bottom:1px solid var(--line)}
-.wrap{max-width:880px;width:100%}
-.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--ind);
-        text-transform:uppercase;margin-bottom:16px}
-.kicker b{color:var(--faint);font-weight:400;margin-right:10px}
-h1{font-size:clamp(30px,4.6vw,48px);font-weight:700;letter-spacing:-.02em;line-height:1.12;
-   margin-bottom:30px}
-h1 .accent{color:var(--ind)}
-.tags{font-family:var(--mono);font-size:13px;color:var(--text2);margin-top:18px}
-.tags i{color:var(--faint);font-style:normal;margin:0 10px}
-.note{color:var(--dim);font-size:14px;margin-top:14px;max-width:62ch}
+button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:focus-visible{outline:2px solid var(--ind);outline-offset:2px}
 
-/* slide 1 — clips */
-.clips{display:flex;gap:14px;margin-top:6px}
-.clipbox{flex:1;aspect-ratio:9/16;max-height:44vh;border:1.5px dashed rgba(255,255,255,.18);
-         border-radius:12px;display:flex;align-items:center;justify-content:center;
-         color:var(--faint);font-family:var(--mono);font-size:12px;text-align:center;
-         padding:16px;background:var(--panel)}
-.clips video{flex:1;min-width:0;max-height:44vh;border-radius:12px;background:#000;object-fit:contain}
+section{height:100svh;overflow:hidden;scroll-snap-align:start;scroll-snap-stop:always;
+        position:relative;display:flex;align-items:center;justify-content:center;
+        padding:0 min(6vw,72px)}
+.wrap{max-width:980px;width:100%}
 
-/* slide 2 — flow pills */
-.flowline{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:8px}
-.pill{border:1px solid rgba(255,255,255,.14);border-radius:24px;padding:10px 20px;
-      font-size:16.5px;color:var(--text);background:var(--panel);white-space:nowrap}
-.fa{color:var(--faint);font-family:var(--mono);font-size:14px}
+/* ---------- shared editorial system ---------- */
+.kicker{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:12px;
+        letter-spacing:.15em;text-transform:uppercase;color:var(--faint);margin-bottom:20px}
+.kicker b{color:var(--ind);font-weight:500}
+.kicker .rule{flex:0 0 40px;height:1px;background:var(--line2)}
+.kicker .price{margin-left:auto;font-size:10.5px;letter-spacing:.1em}
+.kicker .price.free{color:var(--ok)} .kicker .price.paid{color:var(--amber)}
+h1{font-size:clamp(30px,4.6vw,50px);font-weight:700;letter-spacing:-.022em;line-height:1.1;
+   margin-bottom:30px;max-width:24ch}
+h1 .acc{font-family:var(--serif);font-style:italic;font-weight:500;letter-spacing:0;color:var(--ind3)}
+h1 .acc.warm{color:var(--amber)}
+.stage h1{font-size:clamp(25px,3.4vw,38px);margin-bottom:24px}
+.note{color:var(--dim);font-size:14.5px;margin-top:24px;max-width:70ch}
+.note em{color:var(--text2);font-style:normal}
+.tags{font-family:var(--mono);font-size:12.5px;color:var(--text2);margin-top:20px}
+.tags i{color:var(--faint);font-style:normal;margin:0 9px}
 
-/* slides 3 & 4 — short lines */
-.line{display:flex;gap:16px;align-items:baseline;padding:13px 0;font-size:19px;color:var(--text2)}
-.line .n{font-family:var(--mono);color:var(--ind);font-size:14px}
-.line em{color:var(--text);font-style:normal;font-weight:600}
-.line .why{color:var(--dim);font-size:15.5px}
-.foot{margin-top:34px;font-family:var(--mono);font-size:12.5px;color:var(--faint)}
+.demo{margin-top:4px}
+.panel{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:20px 22px}
+.mlabel{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+        color:var(--faint);margin-bottom:12px}
+.badge{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;margin-top:10px}
+.badge.no{color:var(--err)} .badge.yes{color:var(--ok)}
+.aside{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:16px}
+.aside b{color:var(--err);font-weight:500}
+
+/* waveforms — bars built by js, colored by currentColor */
+.wv{display:flex;align-items:flex-end;gap:2px;height:52px}
+.wv i{flex:1;min-width:2px;border-radius:1px;background:currentColor;height:calc(var(--h)*100%)}
+.wv b{display:flex;align-items:flex-end;gap:2px;height:100%;transform-origin:bottom;flex:none}
+.wv b i{flex:none;width:4px}
+.wvgrey{color:var(--dim)} .wvind{color:var(--ind)} .wvamber{color:var(--amber)}
+
+/* ---------- animation machinery ----------
+   every animated element is paused until its section gets .play */
+section .a{animation-play-state:paused!important}
+section.play .a{animation-play-state:running!important}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes duck{to{transform:scaleY(.22)}}
+@keyframes strike{to{transform:scaleX(1)}}
+@keyframes dropword{to{opacity:.25;color:var(--err)}}
+@keyframes meterup{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes seampulse{0%,100%{opacity:.45}50%{opacity:1}}
+@keyframes eq{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
+@keyframes dropin{0%{opacity:0;transform:translateY(-22px)}70%{opacity:1;transform:translateY(2px)}
+                  100%{opacity:1;transform:none}}
+@keyframes drawreg{from{opacity:0;transform:scaleX(.2)}to{opacity:1;transform:scaleX(1)}}
+.a.rise{animation:rise .55s cubic-bezier(.2,.7,.2,1) both}
+.a.fade{animation:fade .5s ease both}
+
+/* ---------- chrome: rail, counter, replay, hint ---------- */
+.rail{position:fixed;right:22px;top:50%;transform:translateY(-50%);display:flex;
+      flex-direction:column;gap:4px;z-index:10}
+.rail button{font-family:var(--mono);font-size:10px;color:var(--faint);padding:2px 6px;
+             border-radius:5px;text-align:right;transition:color .2s}
+.rail button:hover{color:var(--text2)}
+.rail button.on{color:var(--ind)}
+.corner{position:fixed;left:26px;bottom:22px;z-index:10;display:flex;align-items:center;gap:9px;
+        font-family:var(--mono);font-size:11px;color:var(--faint)}
+.corner .bars{display:flex;align-items:flex-end;gap:2px;height:12px}
+.corner .bars i{width:2px;border-radius:1px;background:var(--acc)}
+.count{position:fixed;right:26px;bottom:22px;z-index:10;font-family:var(--mono);font-size:11px;
+       color:var(--faint)}
+.replay{position:absolute;right:26px;top:24px;z-index:5;font-family:var(--mono);font-size:11px;
+        color:var(--faint);padding:6px 10px;border:1px solid transparent;border-radius:7px;
+        transition:color .2s,border-color .2s}
+.replay:hover{color:var(--text2);border-color:var(--line2)}
+.hint{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:10;
+      font-family:var(--mono);font-size:11.5px;color:var(--dim);
+      animation:seampulse 2.6s ease-in-out infinite;transition:opacity .4s}
+.hint.gone{opacity:0;pointer-events:none}
+
+/* ---------- the brick wall — the deck's spine ----------
+   every stage slide lays one brick; the payoff slide shows the finished wall */
+.stagegrid{display:grid;grid-template-columns:1fr 216px;gap:40px;align-items:center}
+.stack{display:flex;flex-direction:column-reverse;gap:5px}
+.brick{height:34px;border-radius:8px;display:flex;align-items:center;padding:0 12px;
+       font-family:var(--mono);font-size:10px;letter-spacing:.05em;white-space:nowrap;
+       overflow:hidden;text-overflow:ellipsis}
+.brick .bn{margin-right:8px;opacity:.6}
+.brick.todo{border:1.5px dashed rgba(255,255,255,.13);color:var(--faint)}
+.brick.built{border:1px solid var(--line2);background:rgba(255,255,255,.04);color:var(--dim)}
+.brick.now{animation:dropin .6s cubic-bezier(.3,.9,.4,1.2) both;color:var(--text);
+           box-shadow:0 6px 22px rgba(0,0,0,.5)}
+.b1.built,.b1.now{border:1px solid var(--faint);background:rgba(255,255,255,.05)}
+.b2.built,.b2.now{border:1px solid transparent;background:linear-gradient(90deg,rgba(144,149,230,.28),rgba(143,216,192,.24))}
+.b3.built,.b3.now{border:1px solid transparent;background:rgba(232,232,238,.16)}
+.b4.built,.b4.now{border:1px solid transparent;background:var(--acc)}
+.b5.built,.b5.now{border:1px solid transparent;background:rgba(240,185,85,.8);color:#1a1408}
+.b5.built{color:rgba(26,20,8,.75)}
+.b6.built,.b6.now{border:1px solid transparent;background:linear-gradient(90deg,var(--acc) 0%,#7a5bc0 55%,rgba(240,185,85,.85) 100%)}
+.slab{height:26px;border-radius:6px;border:1px solid var(--line2);
+      background:repeating-linear-gradient(-45deg,rgba(255,255,255,.05) 0 6px,transparent 6px 12px);
+      display:flex;align-items:center;justify-content:center;font-family:var(--mono);
+      font-size:9px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase;margin-top:3px}
+.stacklabel{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+            color:var(--faint);margin-bottom:10px;text-align:center}
+
+/* why / result rows under each stage demo */
+.wr{display:flex;gap:14px;align-items:baseline;margin-top:16px}
+.wr .k{flex:0 0 58px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+       text-transform:uppercase;color:var(--faint)}
+.wr p{font-size:14.5px;color:var(--text2);max-width:60ch}
+.wr p em{color:var(--text);font-style:normal;font-weight:600}
+.wr.result .k{color:var(--ind)}
+.wr.result p{color:var(--text)}
+.wr.tech{margin-top:12px}
+.wr.tech .k{color:var(--amber)}
+.wr.tech p{font-family:var(--mono);font-size:11.5px;line-height:1.7;color:var(--dim)}
+.wr.tech p b{color:var(--text2);font-weight:500}
+
+/* ================= slide 1 — title ================= */
+.logo{display:flex;align-items:center;gap:11px;margin-bottom:34px}
+.logo .bars{display:flex;align-items:flex-end;gap:3px;height:22px}
+.logo .bars i{width:3px;border-radius:1.5px;background:var(--acc);transform-origin:bottom;
+              animation:eq 1.6s ease-in-out infinite}
+.logo span{font-family:var(--mono);font-size:12px;letter-spacing:.15em;text-transform:uppercase;
+           color:var(--dim)}
+.title{font-size:clamp(54px,9vw,104px);font-weight:700;letter-spacing:-.035em;line-height:1;
+       margin-bottom:18px}
+.subtitle{font-size:clamp(17px,2vw,21px);color:var(--text2);max-width:44ch;margin-bottom:44px}
+.subtitle .acc{font-family:var(--serif);font-style:italic;color:var(--ind3)}
+.hero{position:relative;color:var(--amber)}
+.hero .voiceblock{position:absolute;left:34%;width:30%;top:-30px;height:24px;border-radius:6px;
+                  background:var(--acc);display:flex;align-items:center;justify-content:center;
+                  font-family:var(--mono);font-size:10px;color:#fff;letter-spacing:.08em}
+.legend{display:flex;gap:26px;margin-top:16px;font-family:var(--mono);font-size:11.5px;color:var(--dim);
+        flex-wrap:wrap}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2.5px;margin-right:7px;
+          transform:translateY(1px)}
+.foot{margin-top:38px;font-family:var(--mono);font-size:12px;color:var(--faint)}
 .foot b{color:var(--ind);font-weight:500}
 
-/* dots */
-.dots{position:fixed;right:18px;top:50%;transform:translateY(-50%);display:flex;
-      flex-direction:column;gap:10px;z-index:5}
-.dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.15);transition:background .2s}
-.dots i.on{background:var(--ind)}
-@media (max-width:700px){
-  section{height:auto;min-height:100vh;overflow:visible;padding:64px 20px}
-  .clips{flex-direction:column}.clipbox,.clips video{max-height:36vh}
-  .pill{white-space:normal}
-  .line{font-size:18px}
-  .dots{display:none}
+/* ================= slide 2 — problem, with the two 9:16 clips ================= */
+.probgrid{display:flex;gap:26px;align-items:center}
+.vids{display:flex;gap:14px;align-items:center;flex:none}
+.vslot{position:relative;aspect-ratio:9/16;height:min(48svh,440px);border-radius:14px;
+       border:1.5px dashed rgba(255,255,255,.16);background:var(--panel);
+       display:flex;align-items:center;justify-content:center;overflow:hidden}
+.vslot .ph{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:center;
+           line-height:1.9;padding:0 14px}
+.vslot video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+.vidcol{display:flex;flex-direction:column;gap:12px;align-items:center;flex:none}
+.vidcol video.ex2{display:none}
+.vidcol.show2 video.ex1{display:none}
+.vidcol.show2 video.ex2{display:block}
+.extoggle{display:flex;gap:8px}
+.exbtn{font-family:var(--mono);font-size:11px;color:var(--dim);border:1px solid var(--line2);
+       border-radius:16px;padding:5px 13px;transition:color .2s,border-color .2s,background .2s}
+.exbtn:hover{color:var(--text2)}
+.exbtn.on{color:var(--text);border-color:var(--ind);background:rgba(59,65,201,.14)}
+.vseam{display:flex;flex-direction:column;align-items:center;gap:7px;flex:none}
+.vseam .tick{width:1.5px;height:52px;background:var(--err);animation:seampulse 1.8s ease-in-out infinite}
+.vseam .tlabel{font-family:var(--mono);font-size:9px;color:var(--err);writing-mode:vertical-rl;
+               letter-spacing:.12em}
+.problines{display:flex;flex-direction:column;gap:14px;min-width:0}
+.probline{display:flex;gap:12px;align-items:baseline;font-size:15.5px;color:var(--text2)}
+.probline .n{font-family:var(--mono);font-size:11px;color:var(--err);flex:none}
+.probline em{color:var(--text);font-style:normal;font-weight:600}
+
+/* ================= slide 3 — how films do it ================= */
+.depts{display:flex;flex-direction:column;gap:7px}
+.dept{display:flex;gap:16px;align-items:baseline;border:1px solid var(--line);border-radius:11px;
+      background:var(--panel);padding:12px 16px}
+.dept .dn{font-family:var(--mono);font-size:10px;color:var(--faint);flex:0 0 20px}
+.dept .dt{font-size:14.5px;font-weight:600;flex:0 0 180px}
+.dept .dd{font-size:13px;color:var(--dim);min-width:0}
+.contrast{margin-top:18px;border:1px solid rgba(255,123,123,.3);border-radius:11px;
+          background:rgba(255,123,123,.05);padding:13px 16px;font-size:14.5px;color:var(--text2)}
+.contrast b{color:var(--text);font-weight:600}
+
+/* ================= slides 4–5 — the shortcuts ================= */
+.pathrow{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.pbox{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:13px 16px;
+      flex:1;min-width:150px}
+.pbox .wv{height:36px}
+.pbox.machine{flex:0 0 auto;font-family:var(--mono);font-size:11.5px;color:var(--text2);
+              border-color:var(--line2);text-align:center;padding:14px 18px;line-height:1.4}
+.parrow{font-family:var(--mono);color:var(--faint);font-size:14px;flex:none}
+.script{font-family:var(--mono);font-size:13px;color:var(--text2);line-height:1.7}
+.script .drop{position:relative;animation:dropword .5s ease both;animation-delay:1.3s}
+.pathsplit{border-top:1px solid var(--line);margin:18px 0 16px}
+/* license ledger */
+.licrow{display:flex;align-items:center;gap:14px;padding:11px 16px;border-bottom:1px solid var(--line);
+        font-size:13.5px}
+.licrow:last-child{border-bottom:none}
+.licrow .lm{flex:1.1;color:var(--text);font-weight:600}
+.licrow .lc{flex:1;font-family:var(--mono);font-size:11px;color:var(--dim)}
+.licrow .lv{flex:1.3;font-family:var(--mono);font-size:11px;text-align:right}
+.lv.bad{color:var(--err)} .lv.warn{color:var(--amber)} .lv.mid{color:var(--dim)}
+.ledgerbox{border:1px solid var(--line);border-radius:14px;background:var(--panel);overflow:hidden}
+
+/* ================= the receipts slide ================= */
+.scriptcard{border:1px solid var(--line2);border-radius:12px;background:var(--card);padding:14px 17px;
+            font-family:var(--mono);font-size:11.5px;line-height:2;color:var(--text2)}
+.scriptcard .sk{color:var(--faint)}
+.scriptcard .syl{color:var(--ind)}
+.runs{display:flex;gap:14px;margin-top:14px;flex-wrap:wrap}
+.runcard{flex:1;min-width:230px;border:1px solid var(--line);border-radius:12px;background:var(--panel);
+         padding:12px 15px;font-family:var(--mono);font-size:11.5px;line-height:1.9}
+.runcard .rk{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);
+             display:block;margin-bottom:4px}
+.runcard .same{color:var(--ok)} .runcard .wob{color:var(--err)}
+.rules2{margin-top:16px;display:flex;flex-direction:column;gap:6px;font-family:var(--mono);
+        font-size:11.5px;color:var(--dim)}
+.rules2 span b{color:var(--text2);font-weight:500}
+.outs{margin-top:16px;border-top:1px solid var(--line);padding-top:14px;display:flex;
+      flex-direction:column;gap:8px;font-family:var(--mono);font-size:11.5px;color:var(--dim);
+      line-height:1.7}
+.outs b{color:var(--text2);font-weight:500}
+
+/* ================= the foley demo slide ================= */
+.foleyrow{display:flex;gap:34px;align-items:flex-start}
+.fcol{display:flex;flex-direction:column;gap:10px}
+.foleyrow .vslot{height:min(44svh,400px)}
+
+/* ================= slide 6 — the idea ================= */
+.foundation{margin-top:22px;height:30px;border-radius:7px;border:1px solid var(--line2);
+            background:repeating-linear-gradient(-45deg,rgba(255,255,255,.05) 0 6px,transparent 6px 12px);
+            display:flex;align-items:center;justify-content:center;font-family:var(--mono);
+            font-size:10px;letter-spacing:.14em;color:var(--text2);text-transform:uppercase}
+
+/* ================= stage demos ================= */
+/* detect */
+.dlane{position:relative;color:var(--dim);margin-top:26px}
+.dlane .wv{height:54px}
+.dreg{position:absolute;top:-6px;bottom:-6px;left:var(--x);width:var(--w);border:1.5px solid var(--ind);
+      border-radius:8px;background:rgba(59,65,201,.12);transform-origin:left;
+      animation:drawreg .5s ease both}
+.dreg span{position:absolute;left:4px;top:-20px;font-family:var(--mono);font-size:9.5px;color:var(--ind)}
+/* cast */
+.dreg .owner{position:absolute;left:4px;top:-20px;font-family:var(--mono);font-size:9.5px;
+             color:var(--cast);white-space:nowrap}
+.dreg.animal{border-color:var(--amber);background:rgba(240,185,85,.1)}
+.castcard{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:13px 16px;
+          font-family:var(--mono);font-size:11.5px;color:var(--text2);line-height:1.9}
+.castcard .k{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);
+             display:block;margin-bottom:4px}
+.castcard .same{color:var(--ok)}
+.castrow2{display:flex;gap:16px;align-items:stretch;margin-top:16px;flex-wrap:wrap}
+.castrow2 .castcard{flex:1;min-width:210px}
+/* isolate / convert boxes */
+.moobox{border:1px solid var(--line);border-radius:12px;background:var(--panel);
+        padding:12px 15px;font-family:var(--mono);font-size:12px;color:var(--text2)}
+.moobox .k{color:var(--faint);font-size:10px;display:block;letter-spacing:.1em;
+           text-transform:uppercase;margin-bottom:4px}
+.moobox.machine{border-color:var(--line2);text-align:center}
+.moobox.said{border-color:rgba(255,123,123,.4)}
+.moobox.kept{border-color:rgba(62,207,142,.4)}
+/* separate */
+.eq{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.eq .pbox{flex:1;min-width:130px}
+.eq .op{font-family:var(--mono);font-size:18px;color:var(--faint);flex:none}
+.stemtag{font-family:var(--mono);font-size:10px;margin-top:8px;letter-spacing:.08em}
+.stemtag.old{color:var(--err)} .stemtag.keep{color:var(--ok)}
+.duckread{display:flex;align-items:baseline;gap:14px;margin-top:16px;font-family:var(--mono)}
+.duckread .big{font-size:clamp(24px,3vw,32px);font-weight:500;letter-spacing:-.02em;white-space:nowrap}
+.duckread .big.over{color:var(--err)} .duckread .big.done{color:var(--ok)}
+.duckread .sm{font-size:11.5px;color:var(--dim)}
+/* mix chain */
+.chain{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--line2);border-radius:20px;padding:8px 14px;font-size:13.5px;
+      color:var(--text);background:var(--panel);white-space:nowrap;position:relative}
+.chip small{display:block;font-family:var(--mono);font-size:9px;color:var(--faint);margin-top:1px}
+.chip.last{border-color:var(--acc)}
+.ca{font-family:var(--mono);font-size:12px;color:var(--faint)}
+.reverbtrap{display:inline-flex;align-items:center;gap:10px;margin-bottom:16px;position:relative}
+.reverbtrap .chip{border-color:rgba(255,123,123,.45)}
+.reverbtrap .chip::after{content:"";position:absolute;left:8px;right:8px;top:19px;height:1.5px;
+                         background:var(--err);transform:scaleX(0);transform-origin:left;
+                         animation:strike .45s ease both;animation-delay:1.4s}
+.reverbtrap .verdict{font-family:var(--mono);font-size:11.5px;color:var(--err)}
+
+/* ================= the finished wall ================= */
+.bigwall{max-width:460px;margin:0 auto}
+.bigwall .brick{height:40px;font-size:11px}
+.bigwall .slab{height:30px;font-size:10px}
+.renderline{text-align:center;margin-top:26px;font-family:var(--mono);font-size:12.5px;color:var(--dim)}
+.renderline b{color:var(--ok);font-weight:500}
+
+/* ================= costs ================= */
+.ledger{border:1px solid var(--line);border-radius:14px;background:var(--panel);overflow:hidden}
+.lrow2{display:flex;align-items:center;gap:14px;padding:11px 20px;border-bottom:1px solid var(--line);
+       font-size:14px}
+.lrow2:last-child{border-bottom:none}
+.lrow2 .what{flex:1.4;color:var(--text)}
+.lrow2 .who{flex:1;font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+.lrow2 .price{flex:1.2;font-family:var(--mono);font-size:11.5px;text-align:right}
+.price.free{color:var(--ok)} .price.paid{color:var(--amber)}
+.rules{margin-top:16px;display:flex;flex-direction:column;gap:8px;font-family:var(--mono);
+       font-size:12.5px;color:var(--text2)}
+.rules .r b{color:var(--ind);font-weight:500;margin-right:9px}
+.compare{display:flex;gap:14px;margin-top:18px;flex-wrap:wrap}
+.compcard{flex:1;min-width:230px;border-radius:12px;padding:14px 16px}
+.compcard .ct{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+              margin-bottom:6px}
+.compcard .cp{font-size:clamp(20px,2.4vw,26px);font-weight:700;letter-spacing:-.02em}
+.compcard .cs{font-size:12.5px;color:var(--dim);margin-top:4px}
+.compcard.ours{border:1px solid rgba(62,207,142,.4);background:rgba(62,207,142,.05)}
+.compcard.ours .ct,.compcard.ours .cp{color:var(--ok)}
+.compcard.theirs{border:1px solid rgba(255,123,123,.35);background:rgba(255,123,123,.04)}
+.compcard.theirs .ct,.compcard.theirs .cp{color:var(--err)}
+
+/* ================= what's next ================= */
+.nextlines{display:flex;flex-direction:column;gap:2px}
+.nline{display:flex;gap:16px;align-items:baseline;padding:13px 0;font-size:18px;
+       color:var(--text2);border-bottom:1px solid var(--line)}
+.nline:last-child{border-bottom:none}
+.nline .n{font-family:var(--mono);color:var(--ind);font-size:13px;flex:none}
+.nline em{color:var(--text);font-style:normal;font-weight:600}
+.nline .why{color:var(--dim);font-size:14px}
+
+/* ---------- stagger helpers ---------- */
+.d1{animation-delay:.15s}.d2{animation-delay:.45s}.d3{animation-delay:.75s}.d4{animation-delay:1.05s}
+.d5{animation-delay:1.35s}.d6{animation-delay:1.75s}.d7{animation-delay:2.2s}.d8{animation-delay:2.7s}
+.d9{animation-delay:3.2s}.d10{animation-delay:3.8s}
+
+@media (max-width:900px){
+  .probgrid{flex-direction:column;align-items:flex-start}
+  .vslot{height:min(40svh,360px)}
+}
+@media (max-width:860px){
+  .stagegrid{grid-template-columns:1fr;gap:26px}
+  .stack{max-width:300px}
+}
+@media (max-width:760px){
+  html{scroll-snap-type:none}
+  section{height:auto;min-height:100svh;overflow:visible;padding:76px 20px}
+  .rail{display:none}
+  .dept{flex-wrap:wrap}.dept .dt{flex:none}
+  .licrow{flex-wrap:wrap}.licrow .lv{text-align:left}
+  .lrow2{flex-wrap:wrap}.lrow2 .price{text-align:left}
+  .hero .voiceblock{left:20%;width:52%}
+}
+@media (max-height:740px){
+  h1{margin-bottom:18px}
+  .stage h1{font-size:clamp(22px,3vw,30px)}
+  .note{margin-top:14px}
+  .brick{height:29px}
+  .vslot{height:min(44svh,360px)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+  .script .drop{opacity:.25;color:var(--err)}
+  .reverbtrap .chip::after{transform:scaleX(1)}
 }
 </style>
 </head>
 <body>
 
-<!-- ================================================= 01 · PROBLEM -->
-<section>
+<!-- =========================================== 01 · TITLE -->
+<section id="s1">
   <div class="wrap">
-    <div class="kicker"><b>01</b>The problem</div>
-    <h1>AI clips don't sound like <span class="accent">one video</span>.</h1>
+    <div class="logo">
+      <div class="bars"><i style="height:38%;animation-delay:0s"></i><i style="height:70%;animation-delay:.15s"></i><i style="height:100%;animation-delay:.3s"></i><i style="height:55%;animation-delay:.45s"></i><i style="height:82%;animation-delay:.6s"></i></div>
+      <span>dub studio · the story</span>
+    </div>
+    <h1 class="title a rise d1">Dub Studio</h1>
+    <p class="subtitle a rise d2">A local editor that cleans up <span class="acc">the sound</span> of AI-generated video — the voices, the background, the mix.</p>
 
-    <!-- DROP YOUR TWO CLIPS HERE: replace the two boxes with
-         <video src="clip1.mp4" controls></video>
-         <video src="clip2.mp4" controls></video> -->
-    <div class="clips">
-      <div class="clipbox">CLIP 1</div>
-      <div class="clipbox">CLIP 2</div>
+    <div class="demo a rise d3">
+      <div class="hero">
+        <div class="voiceblock a fade d5">the new voice</div>
+        <div class="wv" data-wave="bed" data-seed="11" data-n="72" data-duck="24-45" data-duckd="1.9s"></div>
+      </div>
+      <div class="legend a fade d6">
+        <span><i style="background:var(--amber)"></i>the original sound — kept underneath</span>
+        <span><i style="background:var(--acc)"></i>the new voice — yours to choose</span>
+      </div>
     </div>
 
-    <div class="tags">the voice changes<i>·</i>the loudness jumps<i>·</i>every cut is audible</div>
-    <p class="note">Movies never made their sound in one take either — dialogue, footsteps and music
-      are added afterwards. So this isn't supposed to work out of the box. That's the part we have
-      to rebuild for AI video.</p>
+    <p class="foot a fade d7">open source · runs on your machine · your own API keys</p>
   </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
 </section>
 
-<!-- ================================================= 02 · SOLUTION, PART ONE -->
-<section>
+<!-- =========================================== 02 · THE PROBLEM — play the two clips here -->
+<section id="s2">
   <div class="wrap">
-    <div class="kicker"><b>02</b>The solution — part one</div>
-    <h1>Keep one voice across <span class="accent">every clip</span>.</h1>
+    <div class="kicker"><b>02</b><span class="rule"></span>the problem — listen for yourself</div>
+    <h1>AI clips don't always sound like <span class="acc">one video</span>.</h1>
 
-    <div class="flowline">
-      <span class="pill">find who speaks, and when</span><span class="fa">→</span>
-      <span class="pill">a new voice re-performs the lines</span><span class="fa">→</span>
-      <span class="pill">separate voice from background</span><span class="fa">→</span>
-      <span class="pill">mix it back together</span>
+    <div class="demo probgrid">
+      <!-- Videos live in demo_videos/. The toggle switches between the two drift examples. -->
+      <div class="vidcol" id="excol">
+        <div class="vids">
+          <div class="vslot a rise d1">
+            <span class="ph">clip 1</span>
+            <video class="ex1" src="demo_videos/video_clip_1_example_1.mp4" controls preload="metadata" playsinline></video>
+            <video class="ex2" src="demo_videos/video_clip_2_example_1.mp4" controls preload="metadata" playsinline></video>
+          </div>
+          <div class="vseam a fade d3"><span class="tick"></span><span class="tlabel">the cut</span></div>
+          <div class="vslot a rise d2">
+            <span class="ph">clip 2</span>
+            <video class="ex1" src="demo_videos/video_clip_1_example_2_drift.mp4" controls preload="metadata" playsinline></video>
+            <video class="ex2" src="demo_videos/video_clip_2_example_2_drift.mp4" controls preload="metadata" playsinline></video>
+          </div>
+        </div>
+        <div class="extoggle a fade d4">
+          <button class="exbtn on" data-ex="1">example 1</button>
+          <button class="exbtn" data-ex="2">example 2</button>
+        </div>
+      </div>
+      <div class="problines">
+        <div class="probline a rise d4"><span class="n">01</span><p><em>no assurances</em> — the same character can come back with a different voice, especially when you switch models</p></div>
+        <div class="probline a rise d5"><span class="n">02</span><p>you can re-roll until it matches — but <em>paying per attempt adds up fast</em></p></div>
+        <div class="probline a rise d6"><span class="n">03</span><p>and the sound isn't clean — the loudness <em>jumps</em>, the music and ambience <em>stop dead at the cut</em></p></div>
+      </div>
+    </div>
+  </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
+</section>
+
+<!-- =========================================== 03 · HOW FILMS DO IT -->
+<section id="s3">
+  <div class="wrap">
+    <div class="kicker"><b>03</b><span class="rule"></span>this is normal — movies rebuild all of it</div>
+    <h1>Film sound is <span class="acc">its own production</span>, after the picture.</h1>
+
+    <div class="demo depts">
+      <div class="dept a rise d1"><span class="dn">01</span><span class="dt">dialogue editor</span><span class="dd">cleans every line; lines that didn't survive the set are re-recorded in a studio (ADR)</span></div>
+      <div class="dept a rise d2"><span class="dn">02</span><span class="dt">foley stage</span><span class="dd">footsteps, cloth, props — performed live to the picture, sound by sound, in sync</span></div>
+      <div class="dept a rise d3"><span class="dn">03</span><span class="dt">effects &amp; ambience</span><span class="dd">layered from libraries and field recordings — rooms, streets, weather</span></div>
+      <div class="dept a rise d4"><span class="dn">04</span><span class="dt">composer</span><span class="dd">music written to the locked cut</span></div>
+      <div class="dept a rise d5"><span class="dn">05</span><span class="dt">re-recording mixer</span><span class="dd">balances all of it into the one track you actually hear</span></div>
+      <div class="contrast a fade d7">An AI clip skips all five and hands you <b>one baked-together track</b> — no stems, no crew, no second pass. That missing stage is what we have to rebuild.</div>
+    </div>
+  </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
+</section>
+
+<!-- =========================================== 04 · SHORTCUT ONE — TRANSCRIBE -->
+<section id="s4">
+  <div class="wrap">
+    <div class="kicker"><b>04</b><span class="rule"></span>why it's harder than it looks · shortcut one</div>
+    <h1>You can't <span class="acc">transcribe</span> your way through it.</h1>
+
+    <div class="demo">
+      <div class="mlabel a fade d1">the obvious plan — have a model write the words down, then read them back in a new voice</div>
+      <div class="pathrow a rise d1">
+        <div class="pbox"><div class="script">"<span class="drop">Well,</span> I guess that's it."</div></div>
+        <span class="parrow">→</span>
+        <div class="pbox machine">vision model<br>transcribes</div>
+        <span class="parrow">→</span>
+        <div class="pbox"><div class="script">"I guess that's it."</div>
+          <div class="badge no a fade d4">✗ words drop and change between runs — even at temperature&nbsp;0</div>
+        </div>
+      </div>
+      <div class="aside a fade d6">and it answers differently every run — the transcript is never the same twice</div>
     </div>
 
-    <p class="note">The new voice copies how each line was said — words, timing, emotion — so nothing
-      is transcribed. The original background is kept, just turned down under each new line.</p>
-
-    <p class="foot">open source · <b>→ live demo</b></p>
+    <p class="note a fade d7">It stacks two hard problems: the transcript itself is unreliable, and even a
+      <em>perfect</em> transcript leaves you placing each new line against a moving mouth by hand. Both
+      disappear if the words never become text at all — hold that thought.</p>
   </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
 </section>
 
-<!-- ================================================= 03 · LEARNINGS -->
-<section>
+<!-- =========================================== 05 · THE RECEIPTS — we tried the transcript route -->
+<section id="s4b">
   <div class="wrap">
-    <div class="kicker"><b>03</b>Learnings</div>
-    <h1>It's not as easy as it sounds.</h1>
+    <div class="kicker"><b>05</b><span class="rule"></span>why it's harder than it looks · the receipts</div>
+    <h1 class="stage" style="font-size:clamp(25px,3.4vw,38px);margin-bottom:24px">We tried the transcript route <span class="acc">for real</span>. Here's what it takes.</h1>
 
-    <div class="line"><span class="n">01</span><p><em>you can't transcribe your way through it.</em> <span class="why">vision models can't reliably get the words right, even at temperature zero — so the new voice copies the audio itself</span></p></div>
-    <div class="line"><span class="n">02</span><p><em>the edge case: two speakers who sound the same.</em> <span class="why">detecting speech is automated and works — but two near-identical AI voices with broken lip-sync can't be split by ear or eye; you mark it yourself</span></p></div>
-    <div class="line"><span class="n">03</span><p><em>the voice model re-voices everything you send it.</em> <span class="why">a bare moo comes back as spoken words — real animal sounds are kept from the original</span></p></div>
-    <div class="line"><span class="n">04</span><p><em>the old voice doesn't just subtract out.</em> <span class="why">it stays audible behind the new one — even real separation leaves traces</span></p></div>
-    <div class="line"><span class="n">05</span><p><em>a raw AI voice doesn't sit in the video.</em> <span class="why">no set loudness, no room — it takes EQ, compression and levelling by ear</span></p></div>
+    <div class="demo">
+      <div class="mlabel a fade d1">to place TTS on a mouth, "the words" aren't enough — v1 asked gemini for all of this, per line</div>
+      <div class="scriptcard a rise d1">
+        <span class="sk">line·</span> @lead · "Well, I guess that's it." <span class="sk">— every word, plus every faint 'hmm' and sigh</span><br>
+        <span class="sk">timing·</span> start 1.70 · end 4.38 <span class="sk">·</span> speed 0.86 <span class="sk">·</span> emotion deadpan<br>
+        <span class="sk">lips·</span> <span class="syl">syllables: Well [1.70–1.92] · I [2.03–2.10] · guess [2.10–2.31] · …</span> <span class="sk">— syllable-level timestamps</span>
+      </div>
+
+      <div class="runs">
+        <div class="runcard a rise d3"><span class="rk">run 1 · same clip · temp 0</span>
+          <span class="same">"Well, I guess that's it."</span><br>start <span class="same">1.70</span> · speed <span class="same">0.86</span> · <span class="same">deadpan</span></div>
+        <div class="runcard a rise d4"><span class="rk">run 2 · same clip · temp 0</span>
+          <span class="same">"Well, I guess that's it."</span><br>start <span class="wob">1.55</span> · speed <span class="wob">1.00</span> · <span class="wob">neutral</span></div>
+      </div>
+      <div class="aside a fade d5">temp 0 locks the <b style="color:var(--ok)">words</b> — the timing digits, speed and emotion still <b>wobble between runs</b>. sometimes perfect, sometimes drift — and "sometimes" doesn't ship.</div>
+
+      <div class="outs">
+        <span class="a fade d7"><b>"just use Whisper"?</b> ASR nails the words, free and local — but words were never the bottleneck. Placement is: exactly WHEN each syllable lands.</span>
+      </div>
+    </div>
+
+    <p class="note a fade d8">STS sidesteps the whole board: the words never leave the audio, so nothing has
+      to be transcribed, timed, or re-attached to the mouth.</p>
   </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
 </section>
 
-<!-- ================================================= 04 · WHAT'S NEXT -->
-<section>
+<!-- =========================================== 06 · SHORTCUT TWO — GENERATE THE SOUND -->
+<section id="s5">
   <div class="wrap">
-    <div class="kicker"><b>04</b>What's next — part two</div>
-    <h1>Next: rebuild the <span class="accent">background</span> too.</h1>
+    <div class="kicker"><b>06</b><span class="rule"></span>why it's harder than it looks · shortcut two</div>
+    <h1>And you can't just <span class="acc warm">generate the sound</span>.</h1>
 
-    <div class="line"><span class="n">→</span><p>today we keep the original background — <em>it's easier</em></p></div>
-    <div class="line"><span class="n">→</span><p>next we make it ourselves — effects, ambience and music become <em>our choice</em></p></div>
-    <div class="line"><span class="n">→</span><p>models suggest sounds on the timeline — <em>you adjust</em></p></div>
+    <div class="demo">
+      <div class="mlabel a fade d1">describe &amp; regenerate loses the exact sound</div>
+      <div class="pathrow a rise d1">
+        <div class="moobox"><span class="k">in the clip</span>a weird, perfectly-timed gag moo</div>
+        <span class="parrow">→</span>
+        <div class="moobox machine">a model describes it:<br>"a cow moos"</div>
+        <span class="parrow">→</span>
+        <div class="moobox said a fade d3"><span class="k">generated from text</span>a generic moo — the joke is gone <span class="badge no">✗</span></div>
+      </div>
 
-    <p class="foot">open source — github.com/… (link goes here)</p>
+      <div class="pathsplit"></div>
+
+      <div class="mlabel a fade d5">video-to-audio foley models exist — using one commercially is another story <span style="color:var(--faint)">(checked aug 2026)</span></div>
+      <div class="ledgerbox a rise d5">
+        <div class="licrow a fade d6"><span class="lm">MMAudio</span><span class="lc">code MIT</span><span class="lv bad">weights CC-BY-NC — no commercial use</span></div>
+        <div class="licrow a fade d7"><span class="lm">ThinkSound</span><span class="lc">code Apache-2.0</span><span class="lv bad">weights research-only</span></div>
+        <div class="licrow a fade d8"><span class="lm">HunyuanVideo-Foley</span><span class="lc">open weights · needs a 8–20 GB GPU</span><span class="lv warn">not licensed in the EU, UK or KR</span></div>
+        <div class="licrow a fade d9"><span class="lm">Veo, Kling &amp; the closed systems</span><span class="lc">strongest quality</span><span class="lv mid">make sound only for video they generated</span></div>
+      </div>
+    </div>
+
+    <p class="note a fade d10">So today there is no drop-in, commercially-safe "add sound to <em>my</em> clip"
+      model — and generation replaces the real sound anyway. The sound you want is already <em>in</em> the
+      clip. That points somewhere else entirely.</p>
   </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
 </section>
 
-<div class="dots"><i class="on"></i><i></i><i></i><i></i></div>
+<!-- =========================================== 07 · FOLEY, TRIED FOR REAL -->
+<section id="s5b">
+  <div class="wrap">
+    <div class="kicker"><b>07</b><span class="rule"></span>why it's harder than it looks · shortcut two, tried for real</div>
+    <h1 class="stage" style="font-size:clamp(25px,3.4vw,38px);margin-bottom:24px">We <span class="acc warm">tried</span> the Foley model on our clips.</h1>
+
+    <div class="demo foleyrow">
+      <div class="fcol a rise d1">
+        <div class="mlabel">attempt 1 — prompted with the dialogue text</div>
+        <div class="vslot">
+          <span class="ph">speech attempt</span>
+          <video src="demo_videos/video_trying_speech_hunyuan.mp4" controls preload="metadata" playsinline></video>
+        </div>
+      </div>
+      <div class="fcol a rise d2">
+        <div class="mlabel">attempt 2 — prompted with music only</div>
+        <div class="vslot">
+          <span class="ph">music attempt</span>
+          <video src="demo_videos/video_trying_music_hunyuan.mp4" controls preload="metadata" playsinline></video>
+        </div>
+      </div>
+    </div>
+
+    <p class="note a fade d4">Same clip, two prompts — the strongest open model, on its free demo. The control
+      is one text box: every attempt re-rolls the <em>whole</em> soundtrack, and steering it is guesswork.</p>
+  </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
+</section>
+
+<!-- =========================================== 08 · THE IDEA (the foundation) -->
+<section id="s6">
+  <div class="wrap">
+    <div class="kicker"><b>08</b><span class="rule"></span>the idea — the foundation everything sits on</div>
+    <h1>Keep the sound. <span class="acc">Re-perform</span> the voice.</h1>
+
+    <div class="demo">
+      <div class="mlabel a fade d1">nothing is transcribed — the audio itself goes through a voice changer (STS)</div>
+      <div class="pathrow a rise d1">
+        <div class="pbox wvgrey"><div class="wv" data-wave="speech" data-seed="63" data-n="30"></div></div>
+        <span class="parrow">→</span>
+        <div class="pbox machine">voice<br>changer</div>
+        <span class="parrow">→</span>
+        <div class="pbox wvind"><div class="wv" data-wave="speech" data-seed="63" data-n="30"></div>
+          <div class="badge yes a fade d4">✓ same words, same timing, same delivery</div>
+        </div>
+      </div>
+
+      <div class="foundation a rise d6">the foundation — re-perform, don't transcribe</div>
+    </div>
+
+    <p class="note a fade d7">A voice changer, not a translator: you sing into autotune, you don't type the
+      lyrics. The words ride along <em>inside the sound</em>, so there is nothing to get wrong — and the
+      background sound, gags included, is recovered from the clip instead of regenerated. Six mechanical
+      steps, each one small. Here they are.</p>
+  </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
+</section>
+
+<!-- =========================================== 07 · STAGE 1 — DETECT -->
+<section id="s7" class="stage">
+  <div class="wrap">
+    <div class="kicker"><b>stage 1 / 6</b><span class="rule"></span>detect<span class="price free">local · free</span></div>
+    <h1>First, find <span class="acc">when</span> anyone speaks.</h1>
+
+    <div class="stagegrid">
+      <div>
+        <div class="panel">
+          <div class="mlabel a fade d1">a local ear model listens to the clip</div>
+          <div class="dlane">
+            <div class="wv" data-wave="mix" data-seed="52" data-n="64"></div>
+            <div class="dreg a" style="--x:21%;--w:33%;animation-delay:.9s"><span>1.70 – 4.38s</span></div>
+            <div class="dreg a" style="--x:63%;--w:7%;animation-delay:1.25s"><span>5.08</span></div>
+            <div class="dreg a" style="--x:77%;--w:17%;animation-delay:1.6s"><span>6.16 – 7.52s</span></div>
+          </div>
+        </div>
+        <div class="wr a fade d5"><span class="k">why</span><p>the ear can tell <em>when</em> — it can never tell <em>who</em>. And it returns no words:
+          just time windows, which is all the rest of the pipeline needs.</p></div>
+        <div class="wr result a fade d6"><span class="k">result</span><p>a timeline: someone makes a sound here, here and here. Drag, split or redo the regions — it's free.</p></div>
+        <div class="wr tech a fade d7"><span class="k">tech</span><p>speaker diarization: <b>pyannote</b> — open weights, runs locally · same job: Silero VAD, NVIDIA NeMo</p></div>
+      </div>
+      <aside>
+        <div class="stacklabel">the wall so far</div>
+        <div class="stack">
+          <div class="slab">re-perform, don't transcribe</div>
+          <div class="brick b1 now a" style="animation-delay:2.1s"><span class="bn">1</span>when — the speech regions</div>
+          <div class="brick b2 todo"><span class="bn">2</span>who — every region owned</div>
+          <div class="brick b3 todo"><span class="bn">3</span>the clean vocal</div>
+          <div class="brick b4 todo"><span class="bn">4</span>the new dialogue</div>
+          <div class="brick b5 todo"><span class="bn">5</span>the background bed</div>
+          <div class="brick b6 todo"><span class="bn">6</span>the mix — one master</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
+</section>
+
+<!-- =========================================== 08 · STAGE 2 — CAST -->
+<section id="s8" class="stage">
+  <div class="wrap">
+    <div class="kicker"><b>stage 2 / 6</b><span class="rule"></span>cast<span class="price paid">~2¢ a clip · or free by hand</span></div>
+    <h1>Then decide <span class="acc">who</span> owns each region.</h1>
+
+    <div class="stagegrid">
+      <div>
+        <div class="panel">
+          <div class="mlabel a fade d1">a vision model watches the clip once — and is handed the cast it already knows</div>
+          <div class="dlane">
+            <div class="wv" data-wave="mix" data-seed="52" data-n="64"></div>
+            <div class="dreg" style="--x:21%;--w:33%;animation:none;opacity:1"><span class="owner a fade d2" style="--cast:var(--cast1)">@lead · speech</span></div>
+            <div class="dreg animal" style="--x:63%;--w:7%;animation:none;opacity:1"><span class="owner a fade d3" style="--cast:var(--amber)">@cow · moo</span></div>
+            <div class="dreg" style="--x:77%;--w:17%;animation:none;opacity:1"><span class="owner a fade d4" style="--cast:var(--cast1)">@lead · speech</span></div>
+          </div>
+        </div>
+        <div class="castrow2">
+          <div class="castcard a rise d5"><span class="k">clip 1 — cast.json starts empty</span>@lead discovered → voice: <b>arthur</b></div>
+          <div class="castcard a rise d6"><span class="k">clip 2 — the cast is handed back</span>@lead recognized → <span class="same">same voice</span></div>
+        </div>
+        <div class="wr a fade d7"><span class="k">why</span><p>the real problem isn't naming a character once — it's the <em>same voice in clip 5 as in
+          clip 1</em>. The running cast list is the memory; the model is told to reuse it.</p></div>
+        <div class="wr result a fade d8"><span class="k">result</span><p>every region has an owner and a kind — and everything is correctable by hand.</p></div>
+        <div class="wr tech a fade d8"><span class="k">tech</span><p>a multimodal video model: <b>Gemini</b> — any model that can watch video works; the consistency comes from the primed cast list, not the model</p></div>
+      </div>
+      <aside>
+        <div class="stacklabel">the wall so far</div>
+        <div class="stack">
+          <div class="slab">re-perform, don't transcribe</div>
+          <div class="brick b1 built"><span class="bn">1</span>when — the speech regions</div>
+          <div class="brick b2 now a" style="animation-delay:2.9s"><span class="bn">2</span>who — every region owned</div>
+          <div class="brick b3 todo"><span class="bn">3</span>the clean vocal</div>
+          <div class="brick b4 todo"><span class="bn">4</span>the new dialogue</div>
+          <div class="brick b5 todo"><span class="bn">5</span>the background bed</div>
+          <div class="brick b6 todo"><span class="bn">6</span>the mix — one master</div>
+        </div>
+      </aside>
+    </div>
+
+    <p class="note a fade d9">The honest limit lives here: two AI voices can sound <em>identical</em> — told
+      "there are exactly two speakers," the ear model still finds one. And on broken clips the lip-sync swaps
+      mouths mid-sentence. When ear and eye both fail, you mark it yourself — one click.</p>
+  </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
+</section>
+
+<!-- =========================================== 09 · STAGE 3 — ISOLATE -->
+<section id="s9" class="stage">
+  <div class="wrap">
+    <div class="kicker"><b>stage 3 / 6</b><span class="rule"></span>isolate<span class="price paid">part of the convert run</span></div>
+    <h1>Strip the voice <span class="acc">clean</span> before converting it.</h1>
+
+    <div class="stagegrid">
+      <div>
+        <div class="panel">
+          <div class="mlabel a fade d1">pull the voice out of the clip's full mix</div>
+          <div class="pathrow a rise d1">
+            <div class="pbox wvgrey"><div class="wv" data-wave="mix" data-seed="58" data-n="30"></div>
+              <div class="stemtag" style="color:var(--faint)">voice + sfx + ambience, glued</div></div>
+            <span class="parrow">→</span>
+            <div class="pbox machine">audio<br>isolation</div>
+            <span class="parrow">→</span>
+            <div class="pbox a fade d3" style="color:#c9c9d4"><div class="wv" data-wave="speech" data-seed="58" data-n="30"></div>
+              <div class="stemtag keep">the voice alone — nothing else</div></div>
+          </div>
+        </div>
+        <div class="wr a fade d5"><span class="k">why</span><p>the voice changer transforms <em>whatever you feed it</em>. Feed it the full mix and it
+          re-performs the background noise too — so it gets a bare vocal, nothing else.</p></div>
+        <div class="wr result a fade d6"><span class="k">result</span><p>a clean vocal, ready to be re-performed.</p></div>
+        <div class="wr tech a fade d7"><span class="k">tech</span><p>voice extraction: <b>ElevenLabs voice isolator</b> · free local challengers: Demucs, UVR (MDX-Net / BS-RoFormer) — not yet as clean as conversion input</p></div>
+      </div>
+      <aside>
+        <div class="stacklabel">the wall so far</div>
+        <div class="stack">
+          <div class="slab">re-perform, don't transcribe</div>
+          <div class="brick b1 built"><span class="bn">1</span>when — the speech regions</div>
+          <div class="brick b2 built"><span class="bn">2</span>who — every region owned</div>
+          <div class="brick b3 now a" style="animation-delay:2.1s"><span class="bn">3</span>the clean vocal</div>
+          <div class="brick b4 todo"><span class="bn">4</span>the new dialogue</div>
+          <div class="brick b5 todo"><span class="bn">5</span>the background bed</div>
+          <div class="brick b6 todo"><span class="bn">6</span>the mix — one master</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
+</section>
+
+<!-- =========================================== 10 · STAGE 4 — CONVERT -->
+<section id="s10" class="stage">
+  <div class="wrap">
+    <div class="kicker"><b>stage 4 / 6</b><span class="rule"></span>convert<span class="price paid">elevenlabs credits — shows the price, asks first</span></div>
+    <h1>Re-perform each line in <span class="acc">the chosen voice</span>.</h1>
+
+    <div class="stagegrid">
+      <div>
+        <div class="panel">
+          <div class="mlabel a fade d1">speech-to-speech, region by region</div>
+          <div class="pathrow a rise d1">
+            <div class="pbox" style="color:#c9c9d4"><div class="wv" data-wave="speech" data-seed="66" data-n="28"></div>
+              <div class="stemtag" style="color:var(--faint)">@lead's line · 1.70s</div></div>
+            <span class="parrow">→</span>
+            <div class="pbox machine">voice changer<br>· arthur ·</div>
+            <span class="parrow">→</span>
+            <div class="pbox wvind a fade d3"><div class="wv" data-wave="speech" data-seed="66" data-n="28"></div>
+              <div class="stemtag keep">placed back at 1.70s — locked to the mouths</div></div>
+          </div>
+        </div>
+        <div class="wr a fade d5"><span class="k">why</span><p>the performance survives because it <em>is</em> the original performance — same words,
+          same timing, same delivery, in a new voice. Nothing to place, nothing to hallucinate.</p></div>
+        <div class="wr result a fade d6"><span class="k">result</span><p>the new dialogue stem. Re-converts archive the old take — nothing is overwritten.</p></div>
+        <div class="wr tech a fade d7"><span class="k">tech</span><p>speech-to-speech: <b>ElevenLabs STS</b> — the main commercial option · open route: RVC-style voice conversion, quality varies a lot</p></div>
+      </div>
+      <aside>
+        <div class="stacklabel">the wall so far</div>
+        <div class="stack">
+          <div class="slab">re-perform, don't transcribe</div>
+          <div class="brick b1 built"><span class="bn">1</span>when — the speech regions</div>
+          <div class="brick b2 built"><span class="bn">2</span>who — every region owned</div>
+          <div class="brick b3 built"><span class="bn">3</span>the clean vocal</div>
+          <div class="brick b4 now a" style="animation-delay:2.1s"><span class="bn">4</span>the new dialogue</div>
+          <div class="brick b5 todo"><span class="bn">5</span>the background bed</div>
+          <div class="brick b6 todo"><span class="bn">6</span>the mix — one master</div>
+        </div>
+      </aside>
+    </div>
+
+    <p class="note a fade d7">The trap: it re-voices <em>everything</em> you send it. A bare moo comes back as a
+      character <em>saying</em> "moo" — a short laugh once came back as invented Spanish. So animal noises and
+      wordless sounds go <em>around</em> the model, kept from the original at their real moments.</p>
+  </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
+</section>
+
+<!-- =========================================== 11 · STAGE 5 — SEPARATE -->
+<section id="s11" class="stage">
+  <div class="wrap">
+    <div class="kicker"><b>stage 5 / 6</b><span class="rule"></span>separate<span class="price free">local · free</span></div>
+    <h1>Keep the background — <span class="acc warm">without the old voice</span>.</h1>
+
+    <div class="stagegrid">
+      <div>
+        <div class="panel">
+          <div class="mlabel a fade d1">a local separation model splits the original audio into two stems</div>
+          <div class="eq a rise d1">
+            <div class="pbox wvgrey"><div class="wv" data-wave="mix" data-seed="83" data-n="26"></div>
+              <div class="stemtag" style="color:var(--faint)">the raw clip</div></div>
+            <span class="op">→</span>
+            <div class="pbox wvgrey a fade d3"><div class="wv" data-wave="speech" data-seed="83" data-n="26"></div>
+              <div class="stemtag old">the old voice — set aside</div></div>
+            <span class="op">+</span>
+            <div class="pbox wvamber a fade d4"><div class="wv" data-wave="bed" data-seed="83" data-n="26"></div>
+              <div class="stemtag keep">sfx + ambience — kept</div></div>
+          </div>
+          <div class="duckread a fade d5">
+            <span class="big over" id="duckn">+4.7 dB</span>
+            <span class="sm" id="duckl">what naive subtraction leaves: the old voice, LOUDER than the new one.</span>
+          </div>
+        </div>
+        <div class="wr a fade d7"><span class="k">why</span><p>the old voice doesn't just subtract out — you hear <em>both voices at once</em>. Real
+          separation plus a duck that is <em>measured in a loop</em>, not set by feel, pushes the leak 28 dB under.</p></div>
+        <div class="wr result a fade d8"><span class="k">result</span><p>the background bed — the real sfx, the real ambience, the old voice masked.</p></div>
+        <div class="wr tech a fade d8"><span class="k">tech</span><p>source separation: <b>audio-separator</b> running UVR's MDX-Net, or BS-RoFormer (better, heavier) — open, local, free · same family: Demucs, Spleeter</p></div>
+      </div>
+      <aside>
+        <div class="stacklabel">the wall so far</div>
+        <div class="stack">
+          <div class="slab">re-perform, don't transcribe</div>
+          <div class="brick b1 built"><span class="bn">1</span>when — the speech regions</div>
+          <div class="brick b2 built"><span class="bn">2</span>who — every region owned</div>
+          <div class="brick b3 built"><span class="bn">3</span>the clean vocal</div>
+          <div class="brick b4 built"><span class="bn">4</span>the new dialogue</div>
+          <div class="brick b5 now a" style="animation-delay:4.6s"><span class="bn">5</span>the background bed</div>
+          <div class="brick b6 todo"><span class="bn">6</span>the mix — one master</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
+</section>
+
+<!-- =========================================== 12 · STAGE 6 — MIX -->
+<section id="s12" class="stage">
+  <div class="wrap">
+    <div class="kicker"><b>stage 6 / 6</b><span class="rule"></span>mix<span class="price free">local · free · endless</span></div>
+    <h1>Make it <span class="acc">sit</span> — a raw AI voice never does.</h1>
+
+    <div class="stagegrid">
+      <div>
+        <div class="reverbtrap a rise d1">
+          <span class="chip">add reverb, for a sense of room<small>the first instinct</small></span>
+          <span class="verdict a fade d3">✗ slap-back echo on every word — keep the voice dry</span>
+        </div>
+        <div class="chain">
+          <span class="chip a rise d4">high-pass<small>remove the rumble</small></span><span class="ca a fade d4">→</span>
+          <span class="chip a rise d5">cut the mud<small>300 Hz</small></span><span class="ca a fade d5">→</span>
+          <span class="chip a rise d6">boost the presence<small>4 kHz — cutting made it dull</small></span><span class="ca a fade d6">→</span>
+          <span class="chip a rise d7">compress<small>steady the swings</small></span><span class="ca a fade d7">→</span>
+          <span class="chip a rise d8">limit<small>catch the peaks</small></span><span class="ca a fade d8">→</span>
+          <span class="chip last a rise d9">normalize — last<small>−16 LUFS · two passes</small></span>
+        </div>
+        <div class="wr a fade d10"><span class="k">why</span><p>a fresh AI voice has no set loudness, no tone, no place in the mix. Tone first, dynamics
+          second, loudness <em>dead last</em> — and every line at <em>one</em> loudness, with the bed ducked under it
+          by a measured amount.</p></div>
+        <div class="wr result a fade d10"><span class="k">result</span><p>a master that plays like one film. Mixing never re-bills — tweak forever.</p></div>
+        <div class="wr tech a fade d10"><span class="k">tech</span><p>audio processing: <b>pedalboard</b> (Spotify's effects library) + <b>ffmpeg</b> EBU R128 loudnorm — the same chain any DAW gives you by hand</p></div>
+      </div>
+      <aside>
+        <div class="stacklabel">the wall so far</div>
+        <div class="stack">
+          <div class="slab">re-perform, don't transcribe</div>
+          <div class="brick b1 built"><span class="bn">1</span>when — the speech regions</div>
+          <div class="brick b2 built"><span class="bn">2</span>who — every region owned</div>
+          <div class="brick b3 built"><span class="bn">3</span>the clean vocal</div>
+          <div class="brick b4 built"><span class="bn">4</span>the new dialogue</div>
+          <div class="brick b5 built"><span class="bn">5</span>the background bed</div>
+          <div class="brick b6 now a" style="animation-delay:4.2s"><span class="bn">6</span>the mix — one master</div>
+        </div>
+      </aside>
+    </div>
+
+    <p class="note a fade d10">Every fader in the app explains itself in plain words, so you can set it by ear.</p>
+  </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
+</section>
+
+<!-- =========================================== 13 · THE WALL, FINISHED -->
+<section id="s13">
+  <div class="wrap">
+    <div class="kicker"><b>15</b><span class="rule"></span>all six bricks</div>
+    <h1 style="text-align:center;max-width:none">Now it sounds like <span class="acc">one video</span>.</h1>
+
+    <div class="demo bigwall">
+      <div class="stack">
+        <div class="slab a fade d1">re-perform, don't transcribe</div>
+        <div class="brick b1 now a d2"><span class="bn">1</span>detect — when anyone speaks</div>
+        <div class="brick b2 now a d3"><span class="bn">2</span>cast — who, in which voice, every clip</div>
+        <div class="brick b3 now a d4"><span class="bn">3</span>isolate — the voice alone</div>
+        <div class="brick b4 now a d5"><span class="bn">4</span>convert — re-performed, not read out</div>
+        <div class="brick b5 now a d6"><span class="bn">5</span>separate — the background, old voice masked</div>
+        <div class="brick b6 now a d7"><span class="bn">6</span>mix — one loudness, one master</div>
+      </div>
+      <div class="renderline a fade d8">render master · <b>free</b> — one stitched file</div>
+    </div>
+  </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
+</section>
+
+<!-- =========================================== 14 · WHAT IT COSTS -->
+<section id="s14">
+  <div class="wrap">
+    <div class="kicker"><b>16</b><span class="rule"></span>what it costs</div>
+    <h1>Mechanical beats <span class="acc">generative</span> — by a lot.</h1>
+
+    <div class="demo">
+      <div class="ledger">
+        <div class="lrow2 a rise d1"><span class="what">detect · separate · edit · mix · render</span><span class="who">your machine</span><span class="price free">free · unlimited</span></div>
+        <div class="lrow2 a rise d2"><span class="what">propose who speaks</span><span class="who">gemini · optional</span><span class="price paid">~2¢ a clip</span></div>
+        <div class="lrow2 a rise d3"><span class="what">isolate + replace the voices</span><span class="who">elevenlabs</span><span class="price paid">a few hundred credits a clip</span></div>
+      </div>
+
+      <div class="compare">
+        <div class="compcard ours a rise d5">
+          <div class="ct">this pipeline · per clip</div>
+          <div class="cp">≈ 10¢</div>
+          <div class="cs">~2¢ Gemini + a few cents of credits. Repeats are cached — free.</div>
+        </div>
+        <div class="compcard theirs a rise d6">
+          <div class="ct">re-rolling the video · per usable clip</div>
+          <div class="cp">≈ $10</div>
+          <div class="cs">~$0.40/s with audio × ~3 attempts — with no assurance the voice lands.</div>
+        </div>
+      </div>
+
+      <div class="rules">
+        <span class="r a fade d7"><b>01</b>every paid run shows its price first, and asks.</span>
+        <span class="r a fade d8"><b>02</b>every result is cached by its exact input — repeating anything unchanged is free.</span>
+      </div>
+    </div>
+
+    <p class="note a fade d9">You pay the AI providers directly — there is nothing to pay me.</p>
+  </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
+</section>
+
+<!-- =========================================== 15 · WHAT'S NEXT -->
+<section id="s15">
+  <div class="wrap">
+    <div class="kicker"><b>17</b><span class="rule"></span>what's next — open source</div>
+    <h1>What's left <span class="acc warm">to build</span>.</h1>
+
+    <div class="demo nextlines">
+      <div class="nline a rise d1"><span class="n">→</span><p>today the original background is kept — <em>because it's easier</em></p></div>
+      <div class="nline a rise d2"><span class="n">→</span><p>next: models propose the effects, ambience and music on the timeline — <em>you adjust each piece</em> <span class="why">vision finds the events; you keep the taste</span></p></div>
+      <div class="nline a rise d3"><span class="n">→</span><p>the one paid step — pulling the voice out — <em>could probably be free</em> <span class="why">open models exist that we haven't tested yet</span></p></div>
+      <div class="nline a rise d4"><span class="n">→</span><p>and things we've barely touched: lip-sync, translated dubs — <em>there's more to find here</em></p></div>
+    </div>
+
+    <!-- put your real repo URL here before presenting -->
+    <p class="foot a fade d5">open source — <b>github.com/…</b> · fork it, build on it</p>
+  </div>
+  <button class="replay" aria-label="Replay this slide's animation">⟳ replay</button>
+</section>
+
+<!-- ---------- fixed chrome ---------- -->
+<nav class="rail" aria-label="Slides"></nav>
+<div class="corner"><div class="bars"><i style="height:35%"></i><i style="height:70%"></i><i style="height:100%"></i><i style="height:50%"></i></div><span>dub studio</span></div>
+<div class="count" id="count">01 / 17</div>
+<div class="hint" id="hint">press ↓ — one idea per slide</div>
 
 <script>
+/* ---------- deterministic waveforms ---------- */
+function rng(seed){let t=seed>>>0;return function(){t+=0x6D2B79F5;let r=Math.imul(t^t>>>15,1|t);
+  r^=r+Math.imul(r^r>>>7,61|r);return((r^r>>>14)>>>0)/4294967296}}
+function heights(kind,seed,n){
+  const r=rng(seed),h=[];
+  if(kind==='speech'||kind==='mix'){           /* bursts of voice with gaps */
+    const bumps=[];let c=r()*0.25;
+    while(c<1){bumps.push([c,0.06+r()*0.12]);c+=0.18+r()*0.3}
+    for(let i=0;i<n;i++){const x=i/n;let v=0;
+      for(const[bc,bw]of bumps){const d=(x-bc)/bw;v=Math.max(v,Math.exp(-d*d))}
+      v=v*(0.55+r()*0.45);
+      if(kind==='mix')v=Math.max(v,0.12+r()*0.22);   /* mix: voice + background floor */
+      h.push(Math.max(0.05,Math.min(1,v)))}
+  }else{                                        /* bed: continuous, occasional swells */
+    for(let i=0;i<n;i++){let v=0.14+r()*0.22;if(r()<0.09)v=0.45+r()*0.4;h.push(v)}
+  }
+  return h}
+document.querySelectorAll('[data-wave]').forEach(el=>{
+  const n=+el.dataset.n||40,seed=+el.dataset.seed||1,kind=el.dataset.wave;
+  const hs=heights(kind,seed,n);
+  const ducks=(el.dataset.duck||'').split(',').filter(Boolean)
+    .map(s=>s.split('-').map(Number));
+  const dd=el.dataset.duckd||'1.2s';
+  let html='',i=0;
+  while(i<n){
+    const span=ducks.find(([a])=>a===i);
+    if(span){let inner='';for(let k=span[0];k<=Math.min(span[1],n-1);k++)
+        inner+=`<i style="--h:${hs[k].toFixed(3)}"></i>`;
+      html+=`<b class="a dk" style="animation:duck .7s ease both;animation-delay:${dd}">${inner}</b>`;
+      i=span[1]+1}
+    else{html+=`<i style="--h:${hs[i].toFixed(3)}"></i>`;i++}
+  }
+  el.innerHTML=html});
+
+/* ---------- slides, rail, keys ---------- */
 const secs=[...document.querySelectorAll('section')];
-const dots=[...document.querySelectorAll('.dots i')];
-const smooth=matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth';
-function cur(){return Math.round(scrollY/innerHeight)}
-function go(i){secs[Math.max(0,Math.min(secs.length-1,i))].scrollIntoView({behavior:smooth})}
+const rail=document.querySelector('.rail');
+const titles=['dub studio','the problem','how films do it','shortcut: transcribe','the receipts',
+              'shortcut: generate','foley, tried','the idea','1 · detect','2 · cast','3 · isolate',
+              '4 · convert','5 · separate','6 · mix','one video','what it costs','what’s next'];
+secs.forEach((s,i)=>{const b=document.createElement('button');
+  b.textContent=String(i+1).padStart(2,'0');b.title=titles[i];
+  b.setAttribute('aria-label','Go to slide '+(i+1)+': '+titles[i]);
+  b.addEventListener('click',()=>go(i));rail.appendChild(b)});
+const dots=[...rail.children],count=document.getElementById('count'),hint=document.getElementById('hint');
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let cur=0,duckTimer=null;
+
+function setCur(i){cur=i;dots.forEach((d,k)=>d.classList.toggle('on',k===i));
+  count.textContent=String(i+1).padStart(2,'0')+' / '+String(secs.length).padStart(2,'0')}
+function go(i){i=Math.max(0,Math.min(secs.length-1,i));
+  secs[i].scrollIntoView({behavior:reduced?'auto':'smooth'});hint.classList.add('gone')}
+
+/* the measured-duck counter (separate stage) */
+function runDuckCounter(){
+  const n=document.getElementById('duckn'),l=document.getElementById('duckl');
+  if(!n)return;
+  n.textContent='+4.7 dB';n.className='big over';
+  l.textContent='what naive subtraction leaves: the old voice, LOUDER than the new one.';
+  if(reduced){n.textContent='−28.0 dB';n.className='big done';
+    l.textContent='separated, then ducked in a measured loop — the leak sits 28 dB under the new voice.';return}
+  clearTimeout(duckTimer);
+  duckTimer=setTimeout(()=>{
+    const t0=performance.now(),dur=1500;
+    (function tick(t){const p=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-p,3);
+      const v=4.7+(-28.0-4.7)*e;
+      n.textContent=(v>0?'+':'−')+Math.abs(v).toFixed(1)+' dB';
+      if(p<1)requestAnimationFrame(tick);
+      else{n.className='big done';
+        l.textContent='separated, then ducked in a measured loop — the leak sits 28 dB under the new voice.'}
+    })(t0)},2400)}
+
+function play(sec){sec.classList.add('play');if(sec.querySelector('#duckn'))runDuckCounter()}
+function unplay(sec){sec.classList.remove('play');if(sec.querySelector('#duckn'))clearTimeout(duckTimer)}
+function replay(sec){unplay(sec);void sec.offsetWidth;play(sec)}
+
+const io=new IntersectionObserver(es=>es.forEach(e=>{
+  const i=secs.indexOf(e.target);
+  if(e.isIntersecting){setCur(i);play(e.target)}else unplay(e.target)
+}),{threshold:0.55});
+secs.forEach(s=>io.observe(s));
+
+document.querySelectorAll('.replay').forEach(b=>b.addEventListener('click',
+  e=>replay(e.currentTarget.closest('section'))));
+
 addEventListener('keydown',e=>{
-  if(['ArrowDown','PageDown',' ','ArrowRight'].includes(e.key)){e.preventDefault();go(cur()+1)}
-  if(['ArrowUp','PageUp','ArrowLeft'].includes(e.key)){e.preventDefault();go(cur()-1)}
+  if(e.target.tagName==='INPUT'||e.target.tagName==='VIDEO')return;
+  if(['ArrowDown','PageDown',' ','ArrowRight','Enter'].includes(e.key)){e.preventDefault();go(cur+1)}
+  if(['ArrowUp','PageUp','ArrowLeft'].includes(e.key)){e.preventDefault();go(cur-1)}
+  if(e.key==='Home'){e.preventDefault();go(0)}
+  if(e.key==='End'){e.preventDefault();go(secs.length-1)}
+  if(e.key==='r'||e.key==='R'){e.preventDefault();replay(secs[cur])}
 });
-addEventListener('scroll',()=>{const c=cur();dots.forEach((d,i)=>d.classList.toggle('on',i===c))},{passive:true});
+addEventListener('scroll',()=>hint.classList.add('gone'),{passive:true,once:true});
+
+/* slide 02 — switch between the two drift examples (show/hide, no src juggling) */
+document.querySelectorAll('.exbtn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#s2 video').forEach(v=>v.pause());
+  document.getElementById('excol').classList.toggle('show2',b.dataset.ex==='2');
+  document.querySelectorAll('.exbtn').forEach(x=>x.classList.toggle('on',x===b));
+}));
 </script>
 </body>
 </html>

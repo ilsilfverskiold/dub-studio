@@ -104,6 +104,18 @@ model splits the original audio so the background survives as its own layer, and
 all dialogue at one loudness and ducks the background under each line by a measured amount. A
 longer write-up on the how and the why is coming as an article.
 
+## The presentation
+
+There's a slide deck that tells the whole story — the problem, why the obvious shortcuts fail,
+the six stages of the pipeline, and what it costs:
+[`docs/presentation_standalone.html`](docs/presentation_standalone.html). It's one self-contained
+file with the demo videos embedded, so download it and double-click — it opens in any browser,
+no server needed. Press ↓ or space to move one idea at a time, ↑ to go back, and R to replay a
+slide's animation.
+
+To change it, edit `docs/presentation.html` (the readable source) and rebuild the standalone with
+`python3 docs/build_standalone.py`.
+
 ## Taking it further
 
 Two things this needs that I haven't solved — for anyone who wants to build on it:

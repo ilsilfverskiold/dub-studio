@@ -9,3 +9,5 @@ output/
 work/
 __pycache__/
 .venv/
+*.mp4
+/demo_videos

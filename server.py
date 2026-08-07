@@ -9,7 +9,8 @@ v2: multiple PROJECTS (each fully self-contained: uploads/state/output/cache), p
 overrides on top of a master mix, take history, in-app API keys (written to dub_studio/.env).
 
 Endpoints:
-  GET  /                     app
+  GET  / | /projects | /p/<project-name>   app shell (routing is client-side)
+  GET  /static/style.css /static/js/<f>.js the app's stylesheet and scripts
   GET  /api/status           full staged state (active project)
   GET  /api/projects         project list
   GET  /api/keys             key presence + masked tails (never full values)
@@ -45,469 +46,27 @@ Endpoints:
   GET  /api/level            ?clip=name | ?master=1 — measured loudness envelope (the amber floor)
 """
 
+
 import hashlib
 import json
 import os
-import threading
 import time
-import traceback
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-
-import numpy as np
 
 import pipeline as pl
 import projects
 import providers as pv
+import session
 from audio_engine import SR, Settings
+from bus import EVENTS, STATE, _EV_LOCK, _clip_emit, _job, _log_path, _pid, _queue_remix, emit
+from runners import run_analyze, run_convert, run_identify, run_render_master, run_remix_one
+from session import (_emit_settings_diff, _final_path, _master_settings, _master_state,
+                     _open_project, _save_project)
+from status import (_VOICES_CACHE, _clip_by_name, _clip_status, _level_points,
+                    _resolve_target, _voice_name)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-UPLOADS = None                     # set by _open_project()
-
-STATE = {"project": None, "clips": [], "settings": Settings().to_dict(), "busy": False, "reel": None}
-EVENTS = {}                        # pid -> [event, ...]
-_EV_LOCK = threading.Lock()
-_TLS = threading.local()           # background jobs pin their project here (see _job)
-_VOICES_CACHE = {"t": 0, "voices": []}
-
-
-def _pid():
-    # A job thread is pinned to the project it was started for; everything else follows the
-    # active project. This is what keeps one project's events out of another project's log.
-    return getattr(_TLS, "pid", None) or (STATE["project"] or {}).get("id") or "_"
-
-
-def _log_path(pid):
-    return os.path.join(projects.project_dir(pid), "logs.jsonl")
-
-
-def emit(clip, stage, message, level="info", metrics=None, detail=None):
-    """message = one human sentence (what is happening and why). detail = the mono under-the-hood
-    line (provider · model · numbers) the UI shows beneath it — the logs teach, not just report.
-    Every event is also appended to the project's logs.jsonl so history survives restarts."""
-    pid = _pid()
-    ev = {"t": time.time(), "clip": os.path.basename(clip) if clip else "",
-          "stage": stage, "message": message, "level": level, "metrics": metrics or {},
-          "detail": detail or ""}
-    with _EV_LOCK:
-        EVENTS.setdefault(pid, []).append(ev)
-    if pid != "_":
-        try:
-            with open(_log_path(pid), "a") as f:
-                f.write(json.dumps(ev) + "\n")
-        except OSError:
-            pass
-
-
-def _load_log_history(pid):
-    """Read the project's persisted log back into memory (last 400 events), trimming the file
-    if it has grown past 1200 lines."""
-    if pid in EVENTS:
-        return
-    evs = []
-    try:
-        with open(_log_path(pid)) as f:
-            lines = [l for l in f.readlines() if l.strip()]
-        if len(lines) > 1200:
-            lines = lines[-400:]
-            with open(_log_path(pid), "w") as f:
-                f.writelines(lines)
-        evs = [json.loads(l) for l in lines[-400:]]
-    except (OSError, json.JSONDecodeError):
-        evs = []
-    EVENTS[pid] = evs
-
-
-def _clip_emit(clip):
-    return lambda stage, message, level="info", metrics=None, detail=None: \
-        emit(clip, stage, message, level, metrics, detail)
-
-
-def _job(fn):
-    pid = _pid()
-    STATE["busy"] = True               # set BEFORE the thread starts — the project-switch gate
-                                       # must never see a gap between "job accepted" and "busy"
-    def run():
-        _TLS.pid = pid                 # emits from this job land in ITS project's log, even if
-                                       # the active project somehow changes mid-run
-        try:
-            fn()
-        except Exception as e:
-            emit("", "error", f"{e}", level="error")
-            traceback.print_exc()
-        finally:
-            STATE["busy"] = False
-        _kick_remix()                  # timeline edits saved while this job ran render now
-    threading.Thread(target=run, daemon=True).start()
-
-
-def _resolve_target(b):
-    """Optional {"clip": name} -> ([path], name) | (None, name-if-unknown) | (None, None)."""
-    name = os.path.basename(b.get("clip", "") or "")
-    if not name:
-        return None, None
-    clip = next((c for c in STATE["clips"] if os.path.basename(c) == name), None)
-    return ([clip] if clip else None), name
-
-
-def _clip_by_name(b):
-    name = os.path.basename(b.get("clip", ""))
-    return next((c for c in STATE["clips"] if os.path.basename(c) == name), None)
-
-
-def _voice_name(vid):
-    for v in _VOICES_CACHE["voices"]:
-        if v.get("voice_id") == vid:
-            return v.get("name")
-    try:
-        for v in pv.el_voices():
-            if v.get("voice_id") == vid:
-                return v.get("name")
-    except Exception:
-        pass
-    return (vid or "")[:10] + "…"
-
-
-def _final_path(clip):
-    return os.path.join(pl.OUTPUT, os.path.splitext(os.path.basename(clip))[0] + "_final.mp4")
-
-
-_LEVEL_CACHE = {}                      # path -> (mtime, points) — measured RMS envelope
-
-
-def _level_env(path, pps=25):
-    """The timeline's level lane: real measured RMS of the RENDERED audio, ~40ms windows,
-    dB clamped to [-60, 0]. What you see is what you hear — never a decorative waveform."""
-    a = pv.read_audio(path)
-    mono = np.mean(a ** 2, axis=0)
-    hop = SR // pps
-    n = len(mono) // hop
-    if n < 2:
-        return []
-    win = mono[:n * hop].reshape(n, hop).mean(axis=1)
-    env = np.clip(10.0 * np.log10(win + 1e-12), -60.0, 0.0)
-    return [round(float(v), 1) for v in env]
-
-
-def _level_points(fpath):
-    mt = os.path.getmtime(fpath)
-    hit = _LEVEL_CACHE.get(fpath)
-    if not hit or hit[0] != mt:
-        try:
-            _LEVEL_CACHE[fpath] = (mt, _level_env(fpath))
-        except Exception:
-            _LEVEL_CACHE[fpath] = (mt, [])
-    return _LEVEL_CACHE[fpath][1]
-
-
-def _master_settings():
-    return Settings.from_dict(STATE["settings"])
-
-
-def _settings_hash(d):
-    return hashlib.sha1(json.dumps(d, sort_keys=True).encode()).hexdigest()[:16]
-
-
-def _emit_settings_diff(clip, old, new, warn_if_same=True):
-    """Log exactly which knobs changed, old -> new — computed from what is actually stored,
-    so the log doubles as proof the change took. Returns True if anything changed."""
-    diffs = [f"{k} {old.get(k)} → {v}" for k, v in new.items() if old.get(k) != v]
-    if diffs:
-        emit(clip, "mix", "settings changed: " + " · ".join(diffs),
-             level="info", detail="every mix from now on renders with these values — old takes keep theirs")
-    elif warn_if_same:
-        emit(clip, "mix", "no setting actually changed — the faders match what's already rendered",
-             level="warn")
-    return bool(diffs)
-
-
-# ------------------------------------------------ project lifecycle
-
-def _open_project(pid):
-    global UPLOADS
-    meta = projects.activate(pid)
-    UPLOADS = os.path.join(projects.project_dir(pid), "uploads")
-    os.makedirs(UPLOADS, exist_ok=True)
-    files = {f: os.path.join(UPLOADS, f) for f in sorted(os.listdir(UPLOADS))
-             if f.lower().endswith(projects.VIDEO_EXTS)}
-    order = [f for f in meta.get("clip_order", []) if f in files]
-    order += [f for f in sorted(files) if f not in order]
-    STATE["clips"] = [files[f] for f in order]
-    STATE["settings"] = {**Settings().to_dict(), **(meta.get("settings") or {})}
-    STATE["reel"] = None
-    STATE["project"] = {"id": pid, "name": meta.get("name", pid)}
-    _load_log_history(pid)
-    emit("", "project", f"opened \"{meta.get('name')}\" — {len(order)} clip(s)", level="ok")
-    # LAW MIGRATION (once per project): the Background fader became an ABSOLUTE level — values
-    # stored under the old meaning must never be silently reinterpreted. Reset to equal-the-
-    # voice and say so; the user sets it where they want from there.
-    if (meta.get("mix_migrated") or 0) < 4:   # the law-4 fader re-meaning, once per project EVER
-        old_bed = STATE["settings"].get("bed_db")
-        STATE["settings"]["bed_db"] = STATE["settings"].get("dialog_db", -16.0)
-        for c in STATE["clips"]:
-            ov = pl.get_clip_override(c)
-            if ov is not None:
-                ov["bed_db"] = ov.get("dialog_db", STATE["settings"]["bed_db"])
-                pl.set_clip_override(c, ov)
-        meta["mix_migrated"] = pl.MIX_LAW
-        meta["settings"] = STATE["settings"]
-        projects.write_meta(pid, meta)
-        emit("", "mix", "the Background fader now means an ABSOLUTE level (same scale as the "
-             f"voice) — reset from {old_bed} to {STATE['settings']['bed_db']:.1f}, equal to the "
-             "voice fader. Move it where you want it; the number is the measured level",
-             level="warn")
-    # STALE CHECK on open — flag only, never render here (auto-rendering on open stalled the
-    # whole app). The master button lights up; ONE free click applies everything pending.
-    # Edits the user makes still render themselves through the queue as always.
-    master = _master_settings()
-    behind = [c for c in STATE["clips"]
-              if pl._read_json(os.path.join(pl.clip_state_dir(c), "meta.json"))
-              and pl.mix_stale(c, master)]
-    if behind:
-        emit("", "mix", f"{len(behind)} clip(s) have sound updates pending — press "
-             "\"Render master · free\" to apply them (no credits)", level="info")
-
-
-def _save_project(reel_meta=None):
-    pid = _pid()
-    if pid == "_":
-        return
-    try:
-        meta = projects.read_meta(pid)
-    except (OSError, json.JSONDecodeError):
-        return
-    meta["clip_order"] = [os.path.basename(c) for c in STATE["clips"]]
-    meta["settings"] = STATE["settings"]
-    if reel_meta is not None:
-        meta["reel_meta"] = reel_meta
-    projects.write_meta(pid, meta)
-
-
-def _reel_meta():
-    try:
-        return projects.read_meta(_pid()).get("reel_meta") or {}
-    except (OSError, json.JSONDecodeError):
-        return {}
-
-
-def _master_state():
-    """none: nothing to assemble yet. stale: something changed since the last render. ok: current."""
-    master = _master_settings()
-    reel = os.path.join(pl.OUTPUT, "reel.mp4")
-    finals = [c for c in STATE["clips"] if os.path.exists(_final_path(c))]
-    rm = _reel_meta()
-    if not finals:
-        return {"state": "none", "rendered_at": None}
-    if not rm.get("rendered_at"):
-        return {"state": "stale", "rendered_at": None}
-    stale = False
-    if rm.get("clip_order") != [os.path.basename(c) for c in STATE["clips"]]:
-        stale = True
-    if rm.get("settings_hash") != _settings_hash(STATE["settings"]):
-        stale = True
-    for c in STATE["clips"]:
-        d = pl.clip_state_dir(c)
-        if not pl._read_json(os.path.join(d, "meta.json")):
-            stale = True                                   # convert-stale
-        elif pl.mix_stale(c, master):
-            stale = True
-    if os.path.exists(reel):
-        mt = [os.path.getmtime(_final_path(c)) for c in finals]
-        if mt and max(mt) > os.path.getmtime(reel) + 1:
-            stale = True
-    elif len(finals) > 1:
-        stale = True
-    return {"state": "stale" if stale else "ok", "rendered_at": rm.get("rendered_at")}
-
-
-# ------------------------------------------------ status
-
-def _clip_status(c):
-    d = pl.clip_state_dir(c)
-    regions, voices, ana = pl.effective_detection(c)
-    who = pl._read_json(os.path.join(d, "who.json"))
-    meta = pl._read_json(os.path.join(d, "meta.json"))
-    edits = pl._read_json(os.path.join(d, "edits.json")) or {}
-    master = _master_settings()
-    cast = {pl._norm_id(x["identifier"]): x for x in pl.load_cast()}
-    chars = []
-    if who:
-        for ch in who.get("chars", []):
-            cc = cast.get(pl._norm_id(ch["identifier"]), {})
-            chars.append({**ch, "identifier": pl._norm_id(ch["identifier"]),
-                          "voice_id": cc.get("voice_id", "")})
-    takes = pl.load_takes(c)
-    out = {
-        "name": os.path.basename(c),
-        "stage": pl.clip_stage(c),
-        "duration": (ana or {}).get("duration"),
-        "voices": voices,
-        "regions": regions,
-        "chars": chars,
-        "assigns": (who or {}).get("assigns", []),
-        "kinds": [a.get("kind") for a in (who or {}).get("assigns", [])],
-        "est": {"el_usd": (ana or {}).get("el_usd", 0), "gemini_usd": (ana or {}).get("gemini_usd", 0),
-                "credits": (ana or {}).get("estimated_credits", 0)},
-        "src": "/media/" + os.path.basename(c),
-        "sensitivity": edits.get("sensitivity"),
-        "duck_regions": edits.get("duck_regions", []),
-        "duck_owned": bool(edits.get("duck_owned")),
-        "duck_windows_owned": bool((meta or {}).get("rendered_duck_owned")),
-        "voice_mutes": edits.get("voice_mutes", []),
-        "voice_splits": edits.get("voice_splits", []),
-        "boost_regions": edits.get("boost_regions", []),
-        "tts_takes": [{"start": t["start"], "end": t["end"], "text": t.get("text", ""),
-                       "file": t.get("file", ""), "speed": t.get("speed"),
-                       "place_at": t.get("place_at"), "character": t.get("character", ""),
-                       "has": bool(t.get("file")) and os.path.exists(
-                           os.path.join(d, "tts", t.get("file", "") or "_"))}
-                      for t in (edits.get("tts_takes") or [])],
-        "duck_windows": (meta or {}).get("duck_windows", []),
-        "chunks": (meta or {}).get("chunks", []),
-        "preserves": (meta or {}).get("preserves", []),   # kept regions — original sound plays
-        "keep_off": pl._keep_off_windows(c),              # Convert-off regions — original plays
-        "voice_dips": edits.get("voice_dips", []),        # original-voice layer turn-downs
-        "mix_override": pl.get_clip_override(c) is not None,
-        "mix_settings": pl.effective_settings(c, master).to_dict(),
-        "mix_stale": pl.mix_stale(c, master),
-        "takes": len(takes.get("takes", [])),
-        "starred_take": takes.get("starred"),
-    }
-    fin = _final_path(c)
-    if os.path.exists(fin):
-        h = pv.file_hash(c)
-        out["final"] = "/media/out/" + os.path.basename(fin)
-        out["stale"] = not bool(meta)     # result exists but no longer matches the chosen settings/voice
-        if os.path.exists(os.path.join(d, "solo_voice.wav")):
-            out["solo_voice"] = f"/media/solo/{h}/voice"
-            out["solo_bed"] = f"/media/solo/{h}/bed"
-    return out
-
-
-# ------------------------------------------------ runners
-
-def run_analyze(targets=None):
-    todo = [c for c in (targets or STATE["clips"])
-            if not pl._read_json(os.path.join(pl.clip_state_dir(c), "analysis.json"))]
-    if not todo:
-        emit("", "detect", "all clips are already detected — nothing to do", level="ok")
-        return
-    for c in todo:
-        pl.analyze(c, _clip_emit(c))
-    emit("", "detect", f"{len(todo)} clip(s) detected — review regions and voice count, then Cast",
-         level="ok")
-
-
-def run_identify(targets=None):
-    n = 0
-    for c in (targets or STATE["clips"]):
-        d = pl.clip_state_dir(c)
-        if not pl._read_json(os.path.join(d, "analysis.json")):
-            pl.analyze(c, _clip_emit(c))
-        if not pl._read_json(os.path.join(d, "who.json")):
-            pl.identify_clip(c, _clip_emit(c))
-            n += 1
-    if n == 0:
-        emit("", "cast", "already cast — nothing to do", level="ok")
-    else:
-        usd = credits = 0
-        for c in (targets or STATE["clips"]):
-            ana = pl._read_json(os.path.join(pl.clip_state_dir(c), "analysis.json")) or {}
-            usd += ana.get("el_usd", 0)
-            credits += ana.get("estimated_credits", 0)
-        emit("", "cast", f"cast ready ({n} clip(s)) — audition the voices, swap any you don't like, "
-             f"then Convert ≈ ${usd:.2f} (≈ {credits} ElevenLabs credits; cached steps are free)",
-             level="ok")
-
-
-def run_convert(targets=None):
-    master = _master_settings()
-    if targets:
-        todo = targets                                    # explicitly asked — run even if converted
-    else:
-        todo = [c for c in STATE["clips"] if pl.clip_stage(c) != "converted"]
-        skipped = len(STATE["clips"]) - len(todo)
-        if skipped:
-            emit("", "convert", f"skipping {skipped} already-converted clip(s) — nothing re-bills",
-                 level="cache")
-    if not todo:
-        emit("", "convert", "everything is already converted — nothing to do", level="ok")
-        return
-    for c in todo:
-        d = pl.clip_state_dir(c)
-        if not pl._read_json(os.path.join(d, "analysis.json")):
-            pl.analyze(c, _clip_emit(c))
-        if not pl._read_json(os.path.join(d, "who.json")):
-            pl.identify_clip(c, _clip_emit(c))
-        pl.convert_clip(c, _clip_emit(c), pl.effective_settings(c, master))
-    _rebuild_reel(master)
-    emit("", "done", "converted — listen below; the sound panel re-mixes for free", level="ok")
-
-
-def _rebuild_reel(master):
-    finals = [_final_path(c) for c in STATE["clips"]
-              if pl.clip_stage(c) == "converted" and os.path.exists(_final_path(c))]
-    if len(finals) > 1:
-        STATE["reel"] = pl.make_reel(finals, master, _clip_emit(""))
-    _save_project(reel_meta={"rendered_at": time.time(),
-                             "clip_order": [os.path.basename(c) for c in STATE["clips"]],
-                             "settings_hash": _settings_hash(STATE["settings"])})
-
-
-def run_render_master():
-    """Free: every clip whose mix is out of date is re-mixed with its EFFECTIVE settings
-    (master ⊕ its own override), then the program is re-stitched. Nothing re-converts."""
-    if _master_state()["state"] == "ok":
-        emit("", "done", "the master is already current — no fader moved and no clip changed, "
-             "so there is nothing to render", level="ok")
-        return
-    master = _master_settings()
-    n = 0
-    for c in STATE["clips"]:
-        if not pl._read_json(os.path.join(pl.clip_state_dir(c), "meta.json")):
-            continue
-        if pl.mix_stale(c, master) or not os.path.exists(_final_path(c)):
-            pl.remix(c, pl.effective_settings(c, master), _clip_emit(c))
-            n += 1
-    _rebuild_reel(master)
-    emit("", "done", f"master rendered — {n} clip mix(es) refreshed, no credits spent", level="ok")
-
-
-def run_remix_one(clip):
-    master = _master_settings()
-    if pl._read_json(os.path.join(pl.clip_state_dir(clip), "meta.json")):
-        pl.remix(clip, pl.effective_settings(clip, master), _clip_emit(clip))
-    emit("", "done", "re-mix complete (no credits spent) — the master is stale until you re-render it",
-         level="ok")
-
-
-# Timeline edits render THEMSELVES (free stage only — nothing here ever converts or bills).
-# A queue instead of a direct job: edits saved DURING a render must render after it, and a
-# burst of edits to one clip coalesces into one remix. The set holds clip paths.
-_PENDING_REMIX = set()
-_RM_LOCK = threading.Lock()
-
-
-def _queue_remix(clip):
-    with _RM_LOCK:
-        _PENDING_REMIX.add(clip)
-    _kick_remix()
-
-
-def _kick_remix():
-    with _RM_LOCK:
-        if STATE["busy"] or not _PENDING_REMIX:
-            return                     # the running job re-kicks when it finishes (see _job)
-        _job(_drain_remixes)
-
-
-def _drain_remixes():
-    while True:
-        with _RM_LOCK:
-            if not _PENDING_REMIX:
-                return
-            clip = _PENDING_REMIX.pop()
-        run_remix_one(clip)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -530,7 +89,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path, _, q = self.path.partition("?")
         query = {k: v[0] for k, v in urllib.parse.parse_qs(q).items()}
-        if path == "/":
+        if path == "/" or path == "/projects" or path.startswith("/p/"):
+            # the app shell for every real URL — /projects and /p/<project-name> are decided
+            # client-side; the server's only job is to serve the same page for all of them
             page = open(os.path.join(HERE, "static", "index.html"), "rb").read()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -538,6 +99,21 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(page)))
             self.end_headers()
             self.wfile.write(page)
+        elif path == "/static/style.css" or \
+                (path.startswith("/static/js/") and path.endswith(".js") and "/" not in path[11:]):
+            sub = "static" if path.endswith(".css") else os.path.join("static", "js")
+            fp = os.path.join(HERE, sub, os.path.basename(path))
+            if not os.path.exists(fp):
+                self._json({"error": "not found"}, 404)
+                return
+            data = open(fp, "rb").read()
+            self.send_response(200)
+            self.send_header("Content-Type", ("text/css" if path.endswith(".css")
+                                              else "text/javascript") + "; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")   # same law as the shell
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
         elif path in ("/docs/presentation", "/docs/presentation.html"):
             page = open(os.path.join(HERE, "docs", "presentation.html"), "rb").read()
             self.send_response(200)
@@ -564,7 +140,12 @@ class Handler(BaseHTTPRequestHandler):
             mt = [os.path.getmtime(_final_path(c)) for c in STATE["clips"] if os.path.exists(_final_path(c))]
             if os.path.exists(reel) and len(finals) > 1:
                 mt.append(os.path.getmtime(reel))
-            page_mtime = os.path.getmtime(os.path.join(HERE, "static", "index.html"))
+            # a newer build of ANY page file (shell, styles or any script) reloads the client
+            jsdir = os.path.join(HERE, "static", "js")
+            page_mtime = max([os.path.getmtime(os.path.join(HERE, "static", f))
+                              for f in ("index.html", "style.css")] +
+                             [os.path.getmtime(os.path.join(jsdir, f))
+                              for f in os.listdir(jsdir) if f.endswith(".js")])
             self._json({"v": 16, "page_mtime": page_mtime, "keys": pv.keys_status(), "clips": clips,
                         "cast": pl.load_cast(),   # PROJECT-wide cast — any character can TTS in any clip
                         "project": STATE["project"], "projects": projects.list_all(),
@@ -679,7 +260,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             fpath = os.path.join(pl.STATE, os.path.basename(parts[1]), "takes", os.path.basename(parts[2]))
         else:
-            fpath = os.path.join(UPLOADS, os.path.basename(rel))
+            fpath = os.path.join(session.UPLOADS, os.path.basename(rel))
         if not os.path.exists(fpath):
             self._json({"error": "not found"}, 404)
             return
@@ -722,7 +303,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"error": "unsupported file type — video files only (.mp4 .mov .m4v .webm)"}, 400)
                 return
             n = int(self.headers.get("Content-Length") or 0)
-            p = os.path.join(UPLOADS, name)
+            p = os.path.join(session.UPLOADS, name)
             open(p, "wb").write(self.rfile.read(n))
             if p not in STATE["clips"]:
                 STATE["clips"].append(p)
@@ -780,7 +361,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"error": "clip list mismatch"}, 400)
         elif route == "/api/remove":
             name = os.path.basename(self._body().get("clip", ""))
-            path = os.path.join(UPLOADS, name)
+            path = os.path.join(session.UPLOADS, name)
             STATE["clips"] = [c for c in STATE["clips"] if os.path.basename(c) != name]
             if os.path.exists(path):
                 os.remove(path)
@@ -1176,11 +757,21 @@ class Handler(BaseHTTPRequestHandler):
             takes[i]["text"] = text
             takes[i]["file"] = fn
             takes[i]["character"] = ident
+            # THE BAR IS THE TAKE (user law): the window sizes itself to the audio that will
+            # actually play, so nothing ever runs invisibly past its bar — and the mixer trims
+            # AT the bar, so a hand-shortened bar audibly cuts the line instead of lying.
+            dur = wav.shape[1] / SR
+            place = float(takes[i].get("place_at", takes[i]["start"]))
+            if not (float(takes[i]["start"]) - 1.0 <= place <= float(takes[i]["end"])):
+                place = float(takes[i]["start"])
+            takes[i]["end"] = round(max(place + dur, float(takes[i]["start"]) + 0.2), 2)
             ed["tts_takes"] = takes
             pl._write_json(ep, ed)
-            emit(clip, "retake", f"TTS ready for {takes[i]['start']:.2f}-{takes[i]['end']:.2f}s "
-                 f"(“{text[:60]}”) — rendering the clip now, free", level="ok",
-                 detail=f"@{ident} · {len(text)} characters · {wav.shape[1]/44100:.2f}s of audio")
+            emit(clip, "retake", f"TTS ready — its bar sized itself to the take: "
+                 f"{takes[i]['start']:.2f}-{takes[i]['end']:.2f}s (“{text[:60]}”) — "
+                 "rendering the clip now, free", level="ok",
+                 detail=f"@{ident} · {len(text)} characters · {dur:.2f}s of audio · "
+                        "the bar on the timeline is exactly as long as what plays")
             _queue_remix(clip)         # renders now — or right after the run in progress finishes
             self._json({"ok": True})
         elif route == "/api/render-master":
@@ -1277,10 +868,11 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"error": "not found"}, 404)
 
 
+
 def main():
     migrated = projects.migrate_legacy()
     reg = projects.load_registry()
-    _open_project(reg["active"])
+    session._open_project(reg["active"])
     if migrated:
         emit("", "project", "existing session moved into this project — everything is intact",
              level="ok")
