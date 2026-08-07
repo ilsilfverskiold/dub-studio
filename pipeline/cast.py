@@ -85,15 +85,20 @@ def save_assign_edits(clip_path, assigns):
             os.remove(mp)
 
 
-def char_edit(action, identifier, new_identifier=None, clip_path=None, updates=None):
+def char_edit(action, identifier, new_identifier=None, clip_path=None, updates=None,
+              voice_id=None):
     """User-controlled cast: add a character yourself, or rename one everywhere (registry + clips)."""
     identifier = _norm_id(identifier)
     cast = load_cast()
     if action == "add":
         if any(_norm_id(c["identifier"]) == identifier for c in cast):
             raise RuntimeError(f"@{identifier} already exists")
-        vid, name, vg = pv.pick_voice("not-important", "not-important",
-                                      exclude={c.get("voice_id") for c in cast})
+        if voice_id and str(voice_id).strip():
+            # the caller chose the voice up front (the TTS modal's inline add) — no starter pick
+            vid, name, vg = str(voice_id).strip(), None, ""
+        else:
+            vid, name, vg = pv.pick_voice("not-important", "not-important",
+                                          exclude={c.get("voice_id") for c in cast})
         cast.append({"identifier": identifier, "description": "animated character",
                      "gender": "not-important", "age": "not-important", "language": "unknown",
                      "role": "supporting", "voice_id": vid, "voice_gender": vg})

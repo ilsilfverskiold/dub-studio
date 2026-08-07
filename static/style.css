@@ -135,7 +135,7 @@ select,input[type=text],input[type=number],input[type=password]{
 select:focus,input[type=text]:focus,input[type=number]:focus{border-color:rgba(122,129,221,.55)}
 select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b6b76' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 8px center;padding-right:24px;cursor:pointer}
-input[type=number]{font-family:var(--mono);font-size:12px;width:78px}
+input[type=number]{font-family:var(--mono);font-size:12px;width:78px;-moz-appearance:textfield}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{
   -webkit-appearance:none;margin:0}
 input[type=range]{accent-color:var(--acc);height:3px;cursor:pointer}
@@ -383,6 +383,9 @@ footer{flex:none;border-top:1px solid var(--line);background:var(--panel);positi
 .tl .tseg:active{cursor:grabbing}
 .tl .tseg:hover{background:#4fd1e0}
 .tl .tseg.pend{background:rgba(79,209,224,.28)}
+/* stale = the generated take no longer matches the character's current voice or the text */
+.tl .tseg.stale{background:rgba(240,185,85,.8)}
+.tl .tseg.stale:hover{background:var(--amber)}
 .tl .tseg.on{box-shadow:0 0 0 1.5px rgba(255,255,255,.55)}
 .tl .tseg::before,.tl .tseg::after{content:"";position:absolute;top:0;bottom:0;width:6px;cursor:ew-resize}
 .tl .tseg::before{left:-2px} .tl .tseg::after{right:-2px}
@@ -454,6 +457,8 @@ footer{flex:none;border-top:1px solid var(--line);background:var(--panel);positi
 .modalbg{position:fixed;inset:0;background:rgba(4,4,6,.78);display:none;align-items:center;
          justify-content:center;z-index:50}
 #modalbg{z-index:60}
+/* the name prompt must rise above the TTS modal it serves (cost dialogs still beat everything) */
+#promptbg{z-index:55}
 .modalbg.show{display:flex}
 .modalbg.show .modal{animation:rise .18s ease-out}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}

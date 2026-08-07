@@ -151,9 +151,12 @@ function renderTimeline(){
       title="original voice turned down ${Math.round(dd.db ?? 60)} dB (${dd.start.toFixed(2)}–${dd.end.toFixed(2)}s) — click to adjust · drag moves · edges resize"></span>`;
   });
   (c.tts_takes||[]).forEach((t, i) => {
-    blocks += `<span class="tseg${t.has ? "" : " pend"}${UI.tts === i ? " on" : ""}" data-i="${i}"
+    const stale = t.has && t.voice_stale;   // the take no longer matches voice/text — amber
+    blocks += `<span class="tseg${t.has ? "" : " pend"}${stale ? " stale" : ""}${UI.tts === i ? " on" : ""}" data-i="${i}"
       style="${px(t.start, t.end)}"
-      title="TTS ${t.start}–${t.end}s${t.character ? " · @" + t.character : ""}${t.has ? " — generated" : " — not generated yet"} · drag to place · edges resize · click opens its editor"
+      title="TTS ${t.start}–${t.end}s${t.character ? " · @" + t.character : ""}${
+        stale ? " — made with a PREVIOUS voice or text: open it and Regenerate"
+              : t.has ? " — generated" : " — not generated yet"} · drag to place · edges resize · click opens its editor"
       onpointerdown="tsegDown(event,${i})"></span>`;
   });
   // ONE class of duck: every ducking space on screen is the same editable amber block —
@@ -526,15 +529,73 @@ function tsegUp(e){
       : t);
   saveTts(c, takes);
 }
+function ttCharOptions(c, sel){
+  // any character introduced ANYWHERE in the project speaks here — plus the door to a new one
+  $("tt_char").innerHTML = allChars(c).map(ch =>
+    `<option value="${ch.identifier}" ${ch.identifier===sel?"selected":""}>@${ch.identifier} — ${voiceName(ch.voice_id)}</option>`).join("")
+    + `<option value="__new__">+ new character…</option>`;
+  // Cancel restores the last REAL selection. Tracked HERE because programmatic selection
+  // (modal open, a successful add) fires no onchange event.
+  if (sel && sel !== "__new__") UI.ttPrevChar = sel;
+}
+function ttNewCharRow(show){
+  const row = $("tt_newchar");
+  row.style.display = show ? "flex" : "none";
+  if (!show) return;
+  $("tt_nc_note").textContent = "Added to the whole project — usable in every clip, for TTS " +
+    "and casting alike. Adding a character never re-converts anything.";
+  $("tt_nc_play").innerHTML = PLAY;
+  $("tt_nc_name").value = "";
+  ensureVoices().then(() => {
+    $("tt_nc_voice").innerHTML = (voicesList||[]).map(v =>
+      `<option value="${v.voice_id}">${esc(v.name)}${Object.values(v.labels||{}).length
+        ? " — " + esc(Object.values(v.labels).slice(0,2).join(", ")) : ""}</option>`).join("")
+      || `<option value="">no voices on the account</option>`;
+  });
+  setTimeout(() => $("tt_nc_name").focus(), 30);
+}
+$("tt_nc_play").onclick = () => {
+  const v = (voicesList||[]).find(x => x.voice_id === $("tt_nc_voice").value);
+  if (v && v.preview){ $("preview").src = v.preview; $("preview").play(); }
+  else toast("no preview available for this voice");
+};
+$("tt_nc_x").onclick = () => {
+  ttNewCharRow(false);
+  const c = cur();
+  if (c) ttCharOptions(c, UI.ttPrevChar || "");
+};
+$("tt_nc_add").onclick = async () => {
+  const c = cur(); if (!c) return;
+  const id = ($("tt_nc_name").value || "").trim().replace(/^@+/, "").replace(/\s+/g, "_");
+  if (!id){ $("tt_nc_note").textContent = "give the character a name first"; return; }
+  const r = await fetch("/api/char", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({action:"add", identifier:id,
+                            voice_id: $("tt_nc_voice").value || undefined})});
+  const j = await r.json().catch(()=>({}));
+  if (!r.ok){ $("tt_nc_note").textContent = j.error || "could not add the character"; return; }
+  // show the new character IMMEDIATELY from what we know — never wait on a status poll
+  // that may have started before the add landed; refresh() reconciles with disk after
+  if (!(S.cast || []).some(x => x.identifier === id))
+    (S.cast = S.cast || []).push({identifier: id, voice_id: $("tt_nc_voice").value || ""});
+  ttNewCharRow(false);
+  const cc = cur();
+  if (cc) ttCharOptions(cc, id);     // selected — Generate speaks this window as them
+  refresh();
+  toast(`@${id} added to the project cast — this window speaks as them now`, "info");
+};
 function openTtsModal(i){
   const c = cur(); if (!c || !(c.tts_takes||[])[i]) return;
   const t = c.tts_takes[i];
   UI.tts = i;
   sigs.tl = null; renderTimeline();                 // selection ring on the segment
   $("tt_span").textContent = `${t.start.toFixed(2)}–${t.end.toFixed(2)}s`;
-  $("tt_note").textContent = t.has
-    ? "This window plays your generated line instead of the STS. Edit the words and regenerate, or remove the window to bring the STS back."
-    : "Replaces the STS with a line spoken in the character's voice — take the words from the original, or type them, then generate.";
+  // ONE short line; amber only when something needs the user's attention
+  $("tt_note").textContent = t.has && t.voice_stale
+    ? "This take was made with a PREVIOUS voice or text — Generate re-makes it (price shown first); until then the old take plays."
+    : t.has
+    ? "Plays your generated line instead of the STS — edit the words and regenerate, or remove the window to bring the STS back."
+    : "Speaks your text in the character's voice instead of the STS — type the words, or let \"Get the words\" read them off the lips.";
+  $("tt_note").style.color = (t.has && t.voice_stale) ? "var(--amber)" : "";
   $("tt_text").value = t.text || "";
   const mid = (t.start + t.end) / 2;
   let autoChar = ((c.chars||[])[0]||{}).identifier || "";
@@ -543,16 +604,21 @@ function openTtsModal(i){
       autoChar = c.assigns[ri].character;
   });
   const selChar = t.character || autoChar;
-  // any character introduced ANYWHERE in the project speaks here
-  $("tt_char").innerHTML = allChars(c).map(ch =>
-    `<option value="${ch.identifier}" ${ch.identifier===selChar?"selected":""}>@${ch.identifier} — ${voiceName(ch.voice_id)}</option>`).join("");
+  ttCharOptions(c, selChar);
+  ttNewCharRow(false);
+  // "spoken by → + new character…" expands the inline row below — name it, pick and audition
+  // its voice, Add. One modal, no stacking. Adding cast NEVER re-converts anything.
+  $("tt_char").onchange = e => {
+    if (e.target.value !== "__new__"){ UI.ttPrevChar = e.target.value; ttNewCharRow(false); return; }
+    ttNewCharRow(true);
+  };
   $("tt_speed").value = t.speed || "";
   $("tt_place").value = (t.place_at != null ? t.place_at : t.start).toFixed(2);
   $("tt_gen").textContent = t.has ? "Regenerate TTS" : "Generate TTS";
   const lp = $("tt_listen");
   if (lp) lp.innerHTML = t.has && c.solo_voice
-    ? `<button class="b sm" onclick="playSoloSpan('${c.solo_voice}', ${t.start}, ${t.end})">▶ voice only</button>
-       <button class="b sm" onclick="playRegion(${t.start}, ${t.end})">▶ in the mix</button>`
+    ? `<button class="lchip" onclick="playSoloSpan('${c.solo_voice}', ${t.start}, ${t.end})">▶ voice only</button>
+       <button class="lchip" onclick="playRegion(${t.start}, ${t.end})">▶ in the mix</button>`
     : "";
   $("ttsbg").classList.add("show");
 }
@@ -566,7 +632,9 @@ function closeTtsModal(discard){
     const text = $("tt_text").value;
     const speed = parseFloat($("tt_speed").value) || undefined;
     const place = parseFloat($("tt_place").value);
-    const chosen = $("tt_char").value || t.character;
+    // "__new__" is the add-row sentinel, never a character — closing mid-add keeps the old one
+    const raw = $("tt_char").value;
+    const chosen = (raw && raw !== "__new__" ? raw : t.character);
     if (text !== (t.text || "") || speed !== t.speed || chosen !== t.character ||
         (!isNaN(place) && place !== (t.place_at != null ? t.place_at : t.start))){
       const takes = c.tts_takes.map((x,k)=> k===UI.tts
@@ -580,7 +648,9 @@ function closeTtsModal(discard){
   UI.tts = null;
   sigs.tl = null; renderTimeline();
 }
-$("tt_close").onclick = closeTtsModal;
+// () wrapper is LOAD-BEARING: assigning closeTtsModal directly passed the CLICK EVENT as
+// `discard` (truthy) — the Close button silently threw away every field edit, forever
+$("tt_close").onclick = () => closeTtsModal();
 $("tt_rm").onclick = () => { const i = UI.tts; closeTtsModal(true); if (i != null) removeTts(i); };
 $("ttsbg").onclick = e => { if (e.target === $("ttsbg")) closeTtsModal(); };
 
@@ -619,6 +689,9 @@ async function generateTts(){
   const c = cur(); if (!c || UI.tts == null) return;
   const text = ($("tt_text") ? $("tt_text").value : "").trim();
   if (!text){ toast("no text — nothing to speak"); return; }
+  if ($("tt_char").value === "__new__"){
+    toast("finish adding the character first (or pick one from the list)"); return;
+  }
   const usd = Math.max(0.01, text.length * 0.0002);
   if (!await ask({title:"Generate the line", cost:`≈ $${usd.toFixed(2)}`,
                   detail:`${text.length} characters = ${text.length} ElevenLabs credits (1 credit per character, exact), spoken in the character's voice for this window. The $ figure assumes ≈$0.20 per 1000 credits — plans vary. Cached: the same text again is free.`,

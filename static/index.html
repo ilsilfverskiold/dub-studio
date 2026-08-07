@@ -127,32 +127,51 @@
 
 <div class="modalbg" id="ttsbg">
   <div class="modal" style="border-color:rgba(70,77,205,.5);max-width:540px">
-    <h3 style="color:var(--ind3)"><span style="color:#4fd1e0">TTS</span> · <span id="tt_span"></span></h3>
-    <p class="note" id="tt_note" style="margin:2px 0 10px"></p>
+    <!-- listening lives WITH the thing you'd listen to (the window), in the app's listen-chip
+         language — never mixed into the production actions below -->
+    <div style="display:flex;align-items:center;gap:8px">
+      <h3 style="margin:0;color:var(--ind3)"><span style="color:#4fd1e0">TTS</span> · <span id="tt_span"></span></h3>
+      <span id="tt_listen" style="display:flex;gap:8px;margin-left:auto"></span>
+    </div>
+    <p class="note" id="tt_note" style="margin:6px 0 12px"></p>
     <textarea id="tt_text" rows="3" placeholder="the line the voice will speak — laughter and hums go in as words: haha, hmm, a sigh"></textarea>
     <div style="display:flex;gap:14px;margin-top:12px">
-      <label class="flabel" style="flex:1.4"><span>spoken by</span>
+      <label class="flabel" style="flex:1;min-width:0"><span>spoken by</span>
         <select id="tt_char" style="width:100%"></select></label>
-      <label class="flabel" style="flex:1"><span>pace × (0.70–1.20)</span>
+      <label class="flabel" style="width:92px;flex:none"><span>pace (0.7–1.2)</span>
         <input type="number" id="tt_speed" step="0.01" min="0.7" max="1.2" placeholder="1.00"
                class="mono" style="width:100%"></label>
-      <label class="flabel" style="flex:1"><span>speech starts (s)</span>
+      <label class="flabel" style="width:92px;flex:none"><span>starts at (s)</span>
         <input type="number" id="tt_place" step="0.01" min="0" class="mono" style="width:100%"></label>
     </div>
-    <p class="note" style="margin:10px 0 0">Everything TTS needs: the words, the pace, and where the
-      mouth starts moving. Set them yourself by ear — or "Get the words" has Gemini read them off
-      the lips, and you correct it.</p>
+    <!-- "+ new character…" expands THIS row — everything happens inside this one modal:
+         name it, pick and audition its voice, Add. No stacked dialogs. -->
+    <div id="tt_newchar" style="display:none;flex-direction:column;gap:8px;margin-top:12px;
+         padding:10px 12px;border-radius:10px;border:1px dashed rgba(255,255,255,.14)">
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        <label class="flabel" style="flex:1;min-width:110px"><span>new character's name</span>
+          <input type="text" id="tt_nc_name" placeholder="narrator"></label>
+        <label class="flabel" style="flex:1.4;min-width:150px"><span>speaks with</span>
+          <select id="tt_nc_voice" style="width:100%"></select></label>
+        <button class="playbtn" id="tt_nc_play" aria-label="audition this voice"
+                title="audition this voice" style="margin-bottom:1px"></button>
+        <button class="b go" id="tt_nc_add">Add</button>
+        <button class="b" id="tt_nc_x">Cancel</button>
+      </div>
+      <span class="note" id="tt_nc_note">Added to the whole project — usable in every clip, for
+        TTS and casting alike. Adding a character never re-converts anything.</span>
+    </div>
     <div id="tt_status" style="display:none;align-items:center;gap:9px;margin-top:12px;
          padding:9px 12px;border-radius:8px;background:rgba(240,185,85,.09);
          border:1px solid rgba(240,185,85,.3);color:var(--amber);font-size:12px">
       <span class="busylamp" style="background:var(--amber)"></span><span id="tt_status_txt"></span>
     </div>
+    <!-- ONE strip, two groups: produce on the left, leave on the right -->
     <div style="display:flex;gap:8px;row-gap:8px;margin-top:16px;align-items:center;flex-wrap:wrap">
-      <button class="b sm" id="tt_tr" onclick="transcribeWindow()">Get the words (&lt; $0.01)</button>
       <button class="b go sm" id="tt_gen" onclick="generateTts()">Generate TTS</button>
-      <span id="tt_listen" style="display:flex;gap:6px"></span>
-      <span style="flex:1"></span>
-      <button class="b sm" id="tt_rm">Remove window</button>
+      <button class="b sm" id="tt_tr" onclick="transcribeWindow()"
+              title="Gemini reads the words, pace and start off the lips — you correct them">Get the words (&lt; $0.01)</button>
+      <button class="b sm" id="tt_rm" style="margin-left:auto">Remove window</button>
       <button class="b sm" id="tt_close">Close</button>
     </div>
   </div>

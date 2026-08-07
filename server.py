@@ -70,6 +70,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 class Handler(BaseHTTPRequestHandler):
+    # HTTP/1.1 keep-alive: Chrome allows only ~6 connections per host, and SSE plus a couple
+    # of throttled <video> streams PIN them all under HTTP/1.0's one-request-per-socket —
+    # measured in the field: every api fetch in the tab hung forever ("I press it and nothing
+    # happens") while curl answered in 0.13s. With keep-alive the small api calls share one
+    # persistent socket instead of fighting the players for a fresh one.
+    protocol_version = "HTTP/1.1"
+
     def log_message(self, *a):
         pass
 
@@ -81,9 +88,12 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _body(self):
+    def _read_body(self):
         n = int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
+
+    def _body(self):
+        return getattr(self, "_req_body", {})
 
     # ------------------------------------------------ GET
     def do_GET(self):
@@ -271,6 +281,15 @@ class Handler(BaseHTTPRequestHandler):
             a, _, b = rng[6:].partition("-")
             start = int(a) if a else 0
             end = int(b) if b else size - 1
+            if not b:
+                # an open-ended range ("bytes=X-") is served in SMALL bounded chunks. Chrome
+                # reads a big response lazily as playback needs it, which keeps the request
+                # open and the socket PINNED for minutes — a couple of players plus the SSE
+                # stream then exhaust the browser's ~6-per-host budget and every api call in
+                # the tab hangs forever (measured: curl 0.13s while the page starved). A 1MB
+                # chunk is swallowed into the media buffer at once, the request completes,
+                # the socket frees; the player just asks for the next chunk when it wants it.
+                end = min(end, start + 1024 * 1024 - 1)
         with open(fpath, "rb") as f:
             f.seek(start)
             data = f.read(end - start + 1)
@@ -287,9 +306,13 @@ class Handler(BaseHTTPRequestHandler):
     # ------------------------------------------------ POST
     def do_POST(self):
         route = self.path.split("?", 1)[0]
+        if route != "/api/upload":     # upload streams its own raw body
+            # ALWAYS drain the request body up front: on a keep-alive socket, unread bytes
+            # would be parsed as the START of the next request and poison the connection
+            self._req_body = self._read_body()
         gated = ("/api/remove", "/api/reset", "/api/clear-cache", "/api/regions", "/api/analyze",
                  "/api/identify", "/api/convert", "/api/remix", "/api/reorder", "/api/kinds",
-                 "/api/voice", "/api/assign", "/api/char", "/api/clip-mix", "/api/render-master",
+                 "/api/voice", "/api/assign", "/api/clip-mix", "/api/render-master",
                  "/api/take", "/api/redetect", "/api/projects")
         # /api/duck is deliberately NOT busy-gated: duck/mute edits are a tiny JSON write that the
         # NEXT render reads — blocking them during a render made removals silently snap back.
@@ -478,11 +501,17 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"ok": True})
         elif route == "/api/char":
             b = self._body()
+            # add = a tiny registry append, safe during a render — the TTS modal's add-character
+            # flow must not die on the busy gate. rename/update rewrite who.json across clips,
+            # so those still wait for the running job.
+            if b.get("action") != "add" and STATE["busy"]:
+                self._json({"error": "a run is in progress — wait for it to finish"}, 409)
+                return
             clip = _clip_by_name(b) if b.get("clip") else None
             try:
                 r = pl.char_edit(b.get("action", ""), b.get("identifier", ""),
                                  new_identifier=b.get("new_identifier"), clip_path=clip,
-                                 updates=b.get("fields"))
+                                 updates=b.get("fields"), voice_id=b.get("voice_id"))
             except RuntimeError as e:
                 self._json({"error": str(e)}, 400)
                 return
@@ -493,9 +522,12 @@ class Handler(BaseHTTPRequestHandler):
             if b.get("action") == "rename":
                 emit(clip or "", "cast", f"renamed @{b.get('identifier')} -> @{b.get('new_identifier')} everywhere",
                      level="ok")
-            else:
+            elif r:
                 emit(clip or "", "cast", f"added @{b.get('identifier')} with starter voice \"{r}\" — "
                      "press Change on its row to pick your own", level="ok")
+            else:
+                emit(clip or "", "cast", f"added @{b.get('identifier')} with the voice you chose — "
+                     "usable in every clip; nothing re-converts", level="ok")
             self._json({"ok": True})
         elif route == "/api/kinds":
             b = self._body()

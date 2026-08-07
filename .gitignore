@@ -11,3 +11,4 @@ __pycache__/
 .venv/
 *.mp4
 /demo_videos
+docs/

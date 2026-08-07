@@ -40,7 +40,22 @@ function renderAll(){
   renderHeader(); renderSidebar(); renderProjects();
   if (UI.view === "studio"){ renderStrip(); renderPlayer(); renderPanel(); renderRail(); renderTimeline(); }
 }
+let _refreshing = null, _refreshQueued = false;
 async function refresh(){
+  // COALESCED: any number of callers collapse into ONE in-flight /api/status plus at most
+  // one trailing call for whatever happened meanwhile. Without this, the SSE history replay
+  // fired one refresh PER replayed log event — hundreds of parallel status fetches on every
+  // page load of a mature project, starving every other request in the tab (the "I press
+  // it and nothing happens" bug).
+  if (_refreshing){ _refreshQueued = true; return _refreshing; }
+  _refreshing = _refreshNow();
+  try { await _refreshing; }
+  finally {
+    _refreshing = null;
+    if (_refreshQueued){ _refreshQueued = false; refresh(); }
+  }
+}
+async function _refreshNow(){
   let s;
   try { s = await (await fetch("/api/status")).json(); }
   catch(e){ $("busy").classList.remove("hidden"); return; }

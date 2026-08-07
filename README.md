@@ -108,10 +108,10 @@ longer write-up on the how and the why is coming as an article.
 
 There's a slide deck that tells the whole story — the problem, why the obvious shortcuts fail,
 the six stages of the pipeline, and what it costs:
-[`docs/presentation_standalone.html`](docs/presentation_standalone.html). It's one self-contained
-file with the demo videos embedded, so download it and double-click — it opens in any browser,
-no server needed. Press ↓ or space to move one idea at a time, ↑ to go back, and R to replay a
-slide's animation.
+[`presentation/presentation_standalone.html`](presentation/presentation_standalone.html). It's one
+self-contained file with the demo videos embedded, so download it and double-click — it opens in
+any browser, no server needed. Press ↓ or space to move one idea at a time, ↑ to go back, and R to
+replay a slide's animation.
 
 ## Taking it further
 

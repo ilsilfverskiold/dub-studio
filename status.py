@@ -1,5 +1,6 @@
 """Read-only reporting: per-clip status, measured level envelopes, voice names."""
 
+import hashlib
 import os
 
 import numpy as np
@@ -72,6 +73,20 @@ def _level_points(fpath):
 
 # ------------------------------------------------ status
 
+def _tts_take_stale(t, who, cast):
+    """True when a generated take no longer matches the window's current text or the
+    character's CURRENT voice (the file name hashes text+voice at generation time).
+    Mirrors /api/tts-retake's resolution: the project cast is the voice authority."""
+    if not t.get("file") or not t.get("character"):
+        return False
+    ident = pl._norm_id(t["character"])
+    vid = (cast.get(ident) or {}).get("voice_id") or \
+          {pl._norm_id(k): v for k, v in ((who or {}).get("voice_of") or {}).items()}.get(ident)
+    if not vid:
+        return False
+    return hashlib.sha1(((t.get("text") or "") + vid).encode()).hexdigest()[:8] not in t["file"]
+
+
 def _clip_status(c):
     d = pl.clip_state_dir(c)
     regions, voices, ana = pl.effective_detection(c)
@@ -110,7 +125,11 @@ def _clip_status(c):
                        "file": t.get("file", ""), "speed": t.get("speed"),
                        "place_at": t.get("place_at"), "character": t.get("character", ""),
                        "has": bool(t.get("file")) and os.path.exists(
-                           os.path.join(d, "tts", t.get("file", "") or "_"))}
+                           os.path.join(d, "tts", t.get("file", "") or "_")),
+                       # the generated file's name hashes text+voice — if the character's
+                       # CURRENT voice (or the window's edited text) no longer matches, the
+                       # take is from a previous voice and the UI must say so, never lie
+                       "voice_stale": _tts_take_stale(t, who, cast)}
                       for t in (edits.get("tts_takes") or [])],
         "duck_windows": (meta or {}).get("duck_windows", []),
         "chunks": (meta or {}).get("chunks", []),

@@ -15,7 +15,7 @@ function renderPanel(){
   const sig = JSON.stringify(["panel", st, c && [c.name, c.stage, c.regions, c.assigns, c.chars, c.voices,
     c.sensitivity, c.mix_override, c.mix_stale, c.est, c.tts_takes, c.voice_dips, c.duck_regions,
     c.boost_regions], UI.region, UI.mixScope, S.master, S.busy, UI.selSeg,
-    voicesList ? voicesList.length : 0, mix.master, mix.clip[UI.mixScope]]);
+    voicesList ? voicesList.length : 0, mix.master, mix.clip[UI.mixScope], S.cast]);
   if (sigs.panel === sig) return; sigs.panel = sig;
   let h = "";
   if (!c && !(st===3)){
@@ -177,6 +177,30 @@ function renderPanel(){
         <button class="b dashed" onclick="addChar('${c.name}')">+ build the cast myself — free</button></div>
       <p class="note" style="margin-top:10px">Gemini watches the clip and proposes characters — or add your own,
       pick its voice, and assign the regions by hand. Both work the same downstream.</p>`;
+    }
+    // TTS VOICES WIND UP IN THE CAST (user law): anyone speaking a generated line on this
+    // clip's timeline appears here — audition or swap their voice in place. Display + voice
+    // only: no region assignments are created, so this can never stale a paid conversion.
+    const ttsChars = [...new Set((c.tts_takes||[]).map(t=>t.character).filter(Boolean))]
+      .filter(id => !(c.chars||[]).some(ch=>ch.identifier===id));
+    if (ttsChars.length){
+      h += `<div class="eyebrow" style="padding:14px 0 7px">TTS VOICES IN THIS CLIP</div>`;
+      h += ttsChars.map((id, i) => {
+        const ch = (S.cast||[]).find(x=>x.identifier===id) || {identifier:id, voice_id:""};
+        const wins = (c.tts_takes||[]).filter(t=>t.character===id);
+        const stale = wins.some(t=>t.has && t.voice_stale);
+        return `<div class="charcard">
+          <div class="disc"></div>
+          <div class="who">
+            <span class="id">@${esc(id)}</span>
+            <span class="sub">${voiceName(ch.voice_id)}${voiceLabels(ch.voice_id) ? " · " + voiceLabels(ch.voice_id) : ""} · speaks ${wins.length} TTS window${wins.length===1?"":"s"}${
+              stale ? ` · <span style="color:var(--amber)">a take still uses a previous voice — open it and Regenerate</span>` : ""}</span>
+          </div>
+          <div class="wave">${waveHTML(40, i+57, 18)}</div>
+          <button class="playbtn" aria-label="audition the voice for ${esc(id)}" onclick="previewVoice('${ch.voice_id}')">${PLAY}</button>
+          <button class="b" onclick="openVoiceBrowser('${esc(id)}')">Change</button>
+        </div>`;
+      }).join("");
     }
   }
 
@@ -559,6 +583,8 @@ function openVoiceBrowser(identifier){
     for (const c of S.clips)
       for (const ch of (c.chars||[]))
         if (ch.identifier === identifier) curv = ch.voice_id;
+    for (const ch of (S.cast||[]))       // the registry is the voice authority — it wins
+      if (ch.identifier === identifier && ch.voice_id) curv = ch.voice_id;
     const rows = [...voicesList].sort((a,b)=>(b.voice_id===curv)-(a.voice_id===curv));
     $("vlist").innerHTML = rows.map(v=>`
       <div class="vrow" style="${v.voice_id===curv?"background:rgba(70,77,205,.09)":""}">
@@ -576,7 +602,11 @@ function chooseVoice(vid){
   for (const c of (S?.clips||[]))                 // optimistic: show the choice IMMEDIATELY
     for (const ch of (c.chars||[]))
       if (ch.identifier === vTarget) ch.voice_id = vid;
+  for (const ch of (S?.cast||[]))                 // the project registry rows tell it too
+    if (ch.identifier === vTarget) ch.voice_id = vid;
   sigs.panel = null; renderPanel();
+  // an open TTS modal's spoken-by labels must tell the same truth, instantly
+  if ($("ttsbg").classList.contains("show") && cur()) ttCharOptions(cur(), $("tt_char").value);
   post("/api/voice", {identifier: vTarget, voice_id: vid});
 }
 $("vuse").onclick = () => chooseVoice($("vpaste").value.trim());
