@@ -1,0 +1,3 @@
+# GitHub Linguist: the presentation embeds media as base64 — it is documentation, not code
+presentation/** linguist-documentation
+screens/** linguist-documentation
