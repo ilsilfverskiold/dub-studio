@@ -138,7 +138,7 @@ def remix(clip_path, settings, emit):
     for a, b in list(chunk_list) + extra_chunks:
         s0, e0 = int(a * SR), min(N, int(b * SR))
         m = ~tts_mask[s0:e0]
-        voice[:, s0:e0] = ae.dialogue_norm(voice[:, s0:e0], settings,
+        voice[:, s0:e0] = ae.dialogue_norm(voice[:, s0:e0],
                                            measure=None if m.all() else m)
         if e0 - s0 > 2 * fade:
             ramp = np.linspace(0.0, 1.0, fade, dtype=np.float32)
@@ -154,11 +154,14 @@ def remix(clip_path, settings, emit):
     if _spans:
         a_meas = ae.active_rms(np.concatenate(_spans, axis=1))
         if a_meas > 1e-8:
-            base = base * float(np.clip((10 ** (settings.dialog_db / 20.0)) / a_meas,
-                                        10 ** (-24 / 20.0), 10 ** (24 / 20.0)))
-            voice_meas_db = 20.0 * np.log10(ae.active_rms(
-                np.concatenate([base[:, int(a * SR):min(N, int(b * SR))]
-                                for a, b in list(chunk_list) + extra_chunks], axis=1)) + 1e-12)
+            # the canvas ran the chain at CHAIN_DB; the fader lands HERE as one flat gain.
+            # Clamp spans the whole fader range (-50..-5 around -16). The meter is pre-scale
+            # measurement + applied gain — exact, and immune to the -45 active floor slicing
+            # into speech at very low fader settings.
+            g = float(np.clip((10 ** (settings.dialog_db / 20.0)) / a_meas,
+                              10 ** (-40 / 20.0), 10 ** (40 / 20.0)))
+            base = base * g
+            voice_meas_db = 20.0 * np.log10(a_meas * g + 1e-12)
     emit("mix", f"voice chain applied: HPF {settings.hpf_hz:.0f} Hz · boom {settings.bass_shelf_db:+.1f} dB · "
          f"notch {settings.notch_db:+.1f} dB @ {settings.notch_hz:.0f} Hz · presence {settings.presence_db:+.1f} · "
          f"air {settings.air_db:+.1f} · de-ess {settings.deess_db:.1f} · comp {settings.comp_ratio:.1f}:1 · "

@@ -119,7 +119,7 @@ Two things this needs that I haven't solved — for anyone who wants to build on
 
 **1. A cheap way to extract the vocal.** The vocal that gets re-voiced is extracted with
 ElevenLabs isolation today, and that is most of the per-clip cost. A local extraction of the same
-quality would make the tool nearly free to run.
+quality would make the tool nearly free to run. Good to try the local voice separation model we use for this too (Roformer).
 
 **2. Build the background instead of borrowing it.** Today the tool keeps the original background
 sound because it's easier. The goal is to build it instead: vision models identify the events that need

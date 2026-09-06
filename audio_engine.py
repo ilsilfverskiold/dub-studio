@@ -183,8 +183,17 @@ def match_low_end(audio, ref_share_db, hz=250.0, max_cut_db=18.0):
 
 
 
-def dialogue_norm(chunk_audio, s: Settings, measure=None):
-    """Normalize one placed chunk's active speech level to the constant dialogue target.
+CHAIN_DB = -16.0
+# The voice canvas's FIXED internal working level. The chain's absolute numbers — comp
+# threshold -18, limiter -1.5, the -45 active floor — are all designed against this level.
+# The dialog_db fader is applied at the FINAL level-set in remix, so chain behavior never
+# changes with the fader position. (Bug this fixes: chunks used to be normalized straight
+# to dialog_db, so a low fader like -42 silently switched the compressor OFF — TTS takes,
+# which are far peakier than STS, then played with unshaved peaks and sounded louder.)
+
+
+def dialogue_norm(chunk_audio, measure=None):
+    """Normalize one placed chunk's active speech level to CHAIN_DB, the internal working level.
     STS returns arbitrary levels per call (a whisper once came back louder than the main line).
     `measure`: optional bool mask — measure ONLY those samples, apply the gain to the whole
     chunk. Used to keep a TTS take inserted INSIDE an STS chunk from dragging the surrounding
@@ -193,7 +202,7 @@ def dialogue_norm(chunk_audio, s: Settings, measure=None):
     a = active_rms(src)
     if a <= 1e-8:
         return chunk_audio
-    g = float(np.clip((10 ** (s.dialog_db / 20.0)) / a, 10 ** (-18 / 20.0), 10 ** (18 / 20.0)))
+    g = float(np.clip((10 ** (CHAIN_DB / 20.0)) / a, 10 ** (-18 / 20.0), 10 ** (18 / 20.0)))
     return chunk_audio * g
 
 

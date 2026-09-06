@@ -321,9 +321,11 @@ function renderPanel(){
     const canRender = dirty || S.master.state !== "ok";
     h += `<div class="mixfoot">` + (scopeMaster
       ? `<button class="b go" id="rendbtn" style="height:36px;padding:0 18px" onclick="renderMaster()"
-           ${canRender && !S.busy ? "" : "disabled"}>${canRender ? "Render master · free" : "Master is current"}</button>
+           title="bounces the full program to one file — free, clips are not re-converted"
+           ${canRender && !S.busy ? "" : "disabled"}>${canRender ? "Render master" : "Master is current"}</button>
          <button class="b" style="height:36px" onclick="downloadMaster()" ${S.master.state==="ok" ? "" : "disabled"}>Download master</button>
-         <span class="note">bounces the full program to one file — clips are not re-converted</span>`
+         <button class="b" style="height:36px;margin-left:auto" onclick="resetAllMix()" ${S.busy ? "disabled" : ""}
+           title="every knob back to our defaults — master and every clip (clips return to Match master). Free — conversions and takes are untouched; anything stale re-renders.">Reset all knobs</button>`
       : (() => {
           const faderDirty = !!mix.clip[UI.mixScope];
           const clipStale = !!(target && target.mix_stale);
@@ -389,6 +391,10 @@ function saveClipMix(name){
 function matchMaster(name){
   delete mix.clip[name];
   post("/api/clip-mix", {clip:name, match_master:true});
+}
+function resetAllMix(){
+  post("/api/mix-reset", {}).then(()=>{ mix.master = null; mix.clip = {};
+                                        toast("every knob back to defaults"); });
 }
 function downloadMaster(){
   const url = S.reel || (S.clips.find(c=>c.final)||{}).final;

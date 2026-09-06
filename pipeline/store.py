@@ -32,7 +32,10 @@ import providers as pv
 # v11 (2026-08-06): auto turn-downs cover the ORIGINAL voice's full burst (attack to tail)
 #   around each line — narrow rectangles let the original's ring play beside the replacement
 #   and every voice sounded echoey.
-MIX_LAW = 11
+# v12 (2026-09-03): the voice canvas runs the tone chain at a FIXED internal level (CHAIN_DB)
+#   and the dialog fader is applied at the final level-set — at a low fader the compressor
+#   used to switch off silently and TTS takes played with unshaved peaks (audibly louder).
+MIX_LAW = 12
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATE = os.path.join(HERE, "state")      # per-project since v2 — server calls set_project_dirs()

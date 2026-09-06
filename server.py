@@ -34,6 +34,7 @@ Endpoints:
   POST /api/convert          {"approved": true} the paid stage
   POST /api/remix            {"settings": {...}} free — master mix change
   POST /api/clip-mix         {"clip", "settings": {...}} or {"clip", "match_master": true}
+  POST /api/mix-reset        every knob back to defaults — master + every clip to Match master (free)
   POST /api/render-master    bounce the full program (free — nothing re-converts)
   POST /api/take             {"clip", "action": "snapshot"|"star"|"unstar"|"delete", "id"?}
   POST /api/reset            clear the ACTIVE project's clips + results + cast
@@ -312,7 +313,7 @@ class Handler(BaseHTTPRequestHandler):
             self._req_body = self._read_body()
         gated = ("/api/remove", "/api/reset", "/api/clear-cache", "/api/regions", "/api/analyze",
                  "/api/identify", "/api/convert", "/api/remix", "/api/reorder", "/api/kinds",
-                 "/api/voice", "/api/assign", "/api/clip-mix", "/api/render-master",
+                 "/api/voice", "/api/assign", "/api/clip-mix", "/api/mix-reset", "/api/render-master",
                  "/api/take", "/api/redetect", "/api/projects")
         # /api/duck is deliberately NOT busy-gated: duck/mute edits are a tiny JSON write that the
         # NEXT render reads — blocking them during a render made removals silently snap back.
@@ -592,6 +593,21 @@ class Handler(BaseHTTPRequestHandler):
             if pl._read_json(os.path.join(pl.clip_state_dir(clip), "meta.json")) and \
                     (changed or pl.mix_stale(clip, _master_settings())):
                 _job(lambda: run_remix_one(clip))
+            self._json({"ok": True})
+        elif route == "/api/mix-reset":
+            # ONE CLICK back to known ground: master knobs to our defaults, every clip back to
+            # Match master. Free — conversions and takes untouched; stale mixes re-render.
+            old = dict(STATE["settings"])
+            STATE["settings"] = Settings().to_dict()
+            _save_project()
+            _emit_settings_diff("", old, STATE["settings"], warn_if_same=False)
+            cleared = [c for c in STATE["clips"] if pl.get_clip_override(c)]
+            for c in cleared:
+                pl.set_clip_override(c, None)
+                emit(c, "mix", "matched to the master mix — per-clip offsets cleared", level="ok")
+            emit("", "mix", "every knob back to defaults" +
+                 (f" — {len(cleared)} clip(s) back to Match master" if cleared else ""), level="ok")
+            _job(run_render_master)
             self._json({"ok": True})
         elif route == "/api/duck":
             b = self._body()
